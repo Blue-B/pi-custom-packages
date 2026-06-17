@@ -1,0 +1,51 @@
+{
+  "name": "pi-winshot",
+  "version": "0.1.0",
+  "description": "Capture and edit the Windows host screen from a WSL-hosted pi agent. Zero external deps — pure PowerShell + .NET. Includes occlusion-safe window capture (PrintWindow), region crop, and privacy masking (black/blur/pixelate).",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "pi-skill",
+    "extension",
+    "skill",
+    "screenshot",
+    "screen-capture",
+    "wsl",
+    "windows",
+    "powershell",
+    "mask",
+    "redact",
+    "privacy",
+    "ai-agent",
+    "claude",
+    "codex"
+  ],
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "files": [
+    "extensions",
+    "skills",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-winshot"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0",
+    "typebox": ">=0.34.0"
+  }
+}
