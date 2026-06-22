@@ -1,0 +1,44 @@
+{
+  "name": "pi-verify-gate",
+  "version": "0.1.0",
+  "description": "Registers /verify (alias /검증): independently re-checks the agent's last conclusion against the raw tool evidence of that turn. The extension picks the target and gathers evidence from the session log itself (not the agent), then a fresh-context reviewer subagent grades each claim PASS/FAIL.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "extension",
+    "verify",
+    "verification",
+    "self-check",
+    "reviewer",
+    "hallucination",
+    "evidence",
+    "ai-agent",
+    "claude",
+    "codex"
+  ],
+  "license": "MIT",
+  "author": "Blue-B",
+  "type": "module",
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-verify-gate"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  }
+}

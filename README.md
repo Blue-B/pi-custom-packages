@@ -10,6 +10,7 @@ A collection of pi extensions and packages that bridge WSL-hosted AI agents with
 |---------|-------------|
 | **[pi-paster](./packages/pi-paster)** | Turns pasted, drag-dropped, or clipboard-provided image paths into first-class image attachments. |
 | **[pi-winshot](./packages/pi-winshot)** | Capture and edit the Windows host screen from a WSL-hosted pi agent — full screen, region, window (even occluded), crop, resize, and privacy masking. |
+| **[pi-verify-gate](./packages/pi-verify-gate)** | Registers `/verify` (alias `/검증`): independently re-checks the agent's last conclusion against the raw tool evidence of that turn, graded PASS/FAIL by a fresh-context reviewer subagent. |
 
 ## Install
 
@@ -17,6 +18,7 @@ A collection of pi extensions and packages that bridge WSL-hosted AI agents with
 # From the repo root, install a specific package
 pi install ./packages/pi-paster
 pi install ./packages/pi-winshot
+pi install ./packages/pi-verify-gate
 
 # Or from GitHub directly
 pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-paster
