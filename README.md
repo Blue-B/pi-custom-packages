@@ -9,7 +9,7 @@ and quality gates that catch the agent's mistakes before you do.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-%3E%3D%200.70-8A2BE2)](https://github.com/earendil-works/pi-coding-agent)
-[![Packages](https://img.shields.io/badge/packages-9-success)]()
+[![Packages](https://img.shields.io/badge/packages-14-success)]()
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)]()
 
 </div>
@@ -28,6 +28,8 @@ Keep sessions from silently breaking: wrong timeouts, schema-invalid tool calls,
 | **[pi-bash-watchdog](./packages/pi-bash-watchdog)** | Guards the bash tool timeout: converts millisecond-style mistakes (`120000` → 120s), caps foreground dev-server commands, fills a sane default. Includes `/bash-watchdog-status`. |
 | **[pi-sanitize-tool-call-ids](./packages/pi-sanitize-tool-call-ids)** | Rewrites malformed tool-call IDs to the `[a-zA-Z0-9_-]` subset before every provider request, so cross-provider sessions never fail schema validation. |
 | **[pi-model-identity](./packages/pi-model-identity)** | Injects the live model identity as a system reminder on first turn, model switch, and after compaction. The model never hallucinates which model it is. Ships a `model_identity_status` tool. |
+| **[pi-def-of-done-gate](./packages/pi-def-of-done-gate)** | Runtime definition-of-done guard: if a turn edits code but runs no verification (diagnostics, test/build/lint, reviewer), it warns and injects a reminder into the next turn. Includes `/def-of-done-status`. |
+| **[pi-force-websearch-defaults](./packages/pi-force-websearch-defaults)** | Forces working `web_search` defaults (provider `exa`, workflow `none`) when the model leaves them unset, preventing dead-provider and stale-curator failures. For [pi-web-access](https://www.npmjs.com/package/pi-web-access) users. |
 
 ### 🧹 Context hygiene
 
@@ -36,6 +38,8 @@ Long image-heavy sessions eat your context window. These keep the outbound provi
 | Package | What it does |
 |---------|--------------|
 | **[pi-normalize-images](./packages/pi-normalize-images)** | Downscales and re-encodes every image in the outbound context via ffmpeg (bounded long edge, SHA1 cache, placeholder for undecodable images). |
+| **[pi-tool-scope-optimizer](./packages/pi-tool-scope-optimizer)** | Per-turn tool scope management: hides redundant provider shims and heavy media tools until a turn actually shows media intent (bilingual English/Korean detection). `/tools-full` and `/tools-lean` overrides. |
+| **[pi-cap-session-watchdog](./packages/pi-cap-session-watchdog)** | On-disk session GC: finds idle oversized session JSONL files, caps stale images and trims live context via bundled scripts, with cross-process debounce and backup pruning. |
 | **[pi-context-image-cap](https://github.com/Blue-B/pi-context-image-cap)** ↗ | Drops all but the most recent image from the outbound context. Standalone repo; pairs perfectly with pi-normalize-images (cap drops the stale ones, normalize shrinks the survivors). |
 
 ### 🎨 Media and input
@@ -46,6 +50,12 @@ Long image-heavy sessions eat your context window. These keep the outbound provi
 | **[pi-winshot](./packages/pi-winshot)** | Capture and edit the Windows host screen from a WSL-hosted pi agent: full screen, region, window (even occluded), crop, resize, privacy masking. |
 | **[pi-gpt-img](./packages/pi-gpt-img)** | `gpt_img` tool: text-to-image and image-to-image via the ChatGPT Codex OAuth backend (gpt-image-2), reusing the OAuth token pi already stores. |
 | **[pi-xai-imagine](./packages/pi-xai-imagine)** | `xai_generate_video` tool: text-to-video and image-to-video via the xAI Grok Imagine API, with OAuth auto-refresh and polling until the MP4 is ready. |
+
+### 🖥️ TUI
+
+| Package | What it does |
+|---------|--------------|
+| **[pi-custom-header](./packages/pi-custom-header)** | Replace pi's built-in startup banner with your own ASCII logo and keybinding hints. Ships as an easy-to-edit template. |
 
 ### 🌐 Related standalone repos
 

@@ -1,0 +1,40 @@
+{
+  "name": "pi-cap-session-watchdog",
+  "version": "0.1.0",
+  "description": "On-disk session garbage collector for pi: finds idle oversized session JSONL files, caps stale images and trims live context via bundled scripts, with cross-process debounce, atomic backups, and backup pruning.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "extension",
+    "session",
+    "disk",
+    "garbage-collection",
+    "images"
+  ],
+  "license": "MIT",
+  "author": "Blue-B",
+  "type": "module",
+  "files": [
+    "extensions",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-cap-session-watchdog"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  }
+}
