@@ -1,0 +1,38 @@
+{
+  "name": "pi-bash-watchdog",
+  "version": "0.1.0",
+  "description": "Guards the bash tool timeout: converts millisecond-style mistakes (120000 to 120s), caps foreground dev-server commands, and fills a sane default so sessions never hang on a stuck command.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "extension",
+    "bash",
+    "timeout",
+    "watchdog"
+  ],
+  "license": "MIT",
+  "author": "Blue-B",
+  "type": "module",
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-bash-watchdog"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  }
+}

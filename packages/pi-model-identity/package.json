@@ -1,0 +1,38 @@
+{
+  "name": "pi-model-identity",
+  "version": "0.1.0",
+  "description": "Injects the live model identity (provider/model id) as a system reminder on first turn, on model switch, and after compaction, so the model never hallucinates which model it is.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "extension",
+    "model-identity",
+    "system-reminder",
+    "hallucination"
+  ],
+  "license": "MIT",
+  "author": "Blue-B",
+  "type": "module",
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-model-identity"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  }
+}
