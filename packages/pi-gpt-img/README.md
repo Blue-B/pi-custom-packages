@@ -56,6 +56,19 @@ The agent will pass the reference to `gpt_img` as the `images` parameter.
 | `format` | `"png" \| "jpeg" \| "webp"` (optional) | Output format. Defaults to `png`. |
 | `dryRun` | `boolean` (optional) | Build the request only, no backend call (no quota used). |
 
+### Context-size handling
+
+The generated file is always written to disk at full resolution. What gets embedded
+back into the session (the base64 block the model actually sees) is downscaled
+first, because a full-res PNG can run 1-2MB and would bloat the transcript and
+every subsequent provider request.
+
+Downscaling requires `ffmpeg` on `PATH`. Without it the extension still works and
+embeds the image as-is.
+
+- `GPTIMG_EMBED_MAX_EDGE` (default `1568`) sets the longest edge, in pixels, of the embedded copy.
+- `GPTIMG_NO_DOWNSCALE=1` embeds the original bytes untouched.
+
 ## Project layout
 
 ```
