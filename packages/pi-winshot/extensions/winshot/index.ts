@@ -23,7 +23,7 @@
 import { spawn, execFileSync } from "node:child_process";
 import { mkdir, readFile, stat } from "node:fs/promises";
 import { existsSync, unlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -157,7 +157,7 @@ function parseJsonLine(stdout: string): any {
 // on-demand re-reading. Override with WINSHOT_EMBED_MAX_EDGE; disable with
 // WINSHOT_NO_DOWNSCALE=1.
 const FFMPEG: string | null = (() => {
-  for (const p of ["/home/shell/.local/bin/ffmpeg", "ffmpeg"]) {
+  for (const p of [join(homedir(), ".local", "bin", "ffmpeg"), "ffmpeg"]) {
     try { execFileSync(p, ["-version"], { stdio: "ignore" }); return p; } catch { /* try next */ }
   }
   return null;

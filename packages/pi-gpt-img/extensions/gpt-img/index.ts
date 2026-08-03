@@ -25,7 +25,7 @@ const TIMEOUT_MS = 600_000;
 // shrink the base64 block that enters the session/provider payload (a full-res
 // PNG here can be 1-2MB+ and bloats the .jsonl / provider request every turn).
 const FFMPEG: string | null = (() => {
-	for (const p of ["/home/shell/.local/bin/ffmpeg", "ffmpeg"]) {
+	for (const p of [join(homedir(), ".local", "bin", "ffmpeg"), "ffmpeg"]) {
 		try {
 			execFileSync(p, ["-version"], { stdio: "ignore" });
 			return p;
