@@ -9,7 +9,7 @@ and quality gates that catch the agent's mistakes before you do.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-%3E%3D%200.70-8A2BE2)](https://github.com/earendil-works/pi-coding-agent)
-[![Packages](https://img.shields.io/badge/packages-15-success)]()
+[![Packages](https://img.shields.io/badge/packages-14-success)]()
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)]()
 
 </div>
@@ -56,7 +56,6 @@ Long image-heavy sessions eat your context window. These keep the outbound provi
 | Package | What it does |
 |---------|--------------|
 | **[pi-custom-header](./packages/pi-custom-header)** | Replace pi's built-in startup banner with your own ASCII logo and keybinding hints. Ships as an easy-to-edit template. |
-| **[pi-skill-indicator](./packages/pi-skill-indicator)** | TUI footer status + toast whenever the agent triggers a skill (reads a `SKILL.md`), cleared at turn end. Know mid-conversation that a skill is actually active. |
 
 ### 🌐 Related standalone repos
 
