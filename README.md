@@ -28,7 +28,6 @@ Keep sessions from silently breaking: wrong timeouts, schema-invalid tool calls,
 | **[pi-bash-watchdog](./packages/pi-bash-watchdog)** | Guards the bash tool timeout: converts millisecond-style mistakes (`120000` → 120s), caps foreground dev-server commands, fills a sane default. Includes `/bash-watchdog-status`. |
 | **[pi-sanitize-tool-call-ids](./packages/pi-sanitize-tool-call-ids)** | Rewrites malformed tool-call IDs to the `[a-zA-Z0-9_-]` subset before every provider request, so cross-provider sessions never fail schema validation. |
 | **[pi-model-identity](./packages/pi-model-identity)** | Injects the live model identity as a system reminder on first turn, model switch, and after compaction. The model never hallucinates which model it is. Ships a `model_identity_status` tool. |
-| **[pi-def-of-done-gate](./packages/pi-def-of-done-gate)** | Runtime definition-of-done guard: if a turn edits code but runs no verification (diagnostics, test/build/lint, reviewer), it warns and injects a reminder into the next turn. Includes `/def-of-done-status`. |
 | **[pi-force-websearch-defaults](./packages/pi-force-websearch-defaults)** | Forces working `web_search` defaults (provider `exa`, workflow `none`) when the model leaves them unset, preventing dead-provider and stale-curator failures. For [pi-web-access](https://www.npmjs.com/package/pi-web-access) users. |
 
 ### 🧹 Context hygiene
@@ -38,7 +37,6 @@ Long image-heavy sessions eat your context window. These keep the outbound provi
 | Package | What it does |
 |---------|--------------|
 | **[pi-normalize-images](./packages/pi-normalize-images)** | Downscales and re-encodes every image in the outbound context via ffmpeg (bounded long edge, SHA1 cache, placeholder for undecodable images). |
-| **[pi-tool-scope-optimizer](./packages/pi-tool-scope-optimizer)** | Per-turn tool scope management: hides redundant provider shims and heavy media tools until a turn actually shows media intent (bilingual English/Korean detection). `/tools-full` and `/tools-lean` overrides. |
 | **[pi-cap-session-watchdog](./packages/pi-cap-session-watchdog)** | On-disk session GC: finds idle oversized session JSONL files, caps stale images and trims live context via bundled scripts, with cross-process debounce and backup pruning. |
 | **[pi-context-image-cap](https://github.com/Blue-B/pi-context-image-cap)** ↗ | Drops all but the most recent image from the outbound context. Standalone repo; pairs perfectly with pi-normalize-images (cap drops the stale ones, normalize shrinks the survivors). |
 
@@ -50,6 +48,8 @@ Long image-heavy sessions eat your context window. These keep the outbound provi
 | **[pi-winshot](./packages/pi-winshot)** | Capture and edit the Windows host screen from a WSL-hosted pi agent: full screen, region, window (even occluded), crop, resize, privacy masking. |
 | **[pi-gpt-img](./packages/pi-gpt-img)** | `gpt_img` tool: text-to-image and image-to-image via the ChatGPT Codex OAuth backend (gpt-image-2), reusing the OAuth token pi already stores. |
 | **[pi-xai-imagine](./packages/pi-xai-imagine)** | `xai_generate_video` tool: text-to-video and image-to-video via the xAI Grok Imagine API, with OAuth auto-refresh and polling until the MP4 is ready. |
+| **[pi-cursor](./packages/pi-cursor)** | Drive the Windows mouse and keyboard from WSL: focus a window, move the cursor with natural easing, click, type. Pure PowerShell, no AutoHotkey. |
+| **[pi-recordly](./packages/pi-recordly)** | Control the Recordly screen recorder on Windows: start and stop recordings, pick a window or screen source, read status. |
 
 ### 🖥️ TUI
 
