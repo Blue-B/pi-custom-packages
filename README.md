@@ -16,6 +16,27 @@ and quality gates that catch the agent's mistakes before you do.
 
 ---
 
+Every package here came out of daily use: something broke, or something was
+missing, and the fix was small enough to keep. They are all independently
+installable, so take the two you need and ignore the rest.
+
+## Platform support
+
+Most packages run anywhere pi runs. Three of them reach into the Windows host
+and therefore need WSL with interop enabled.
+
+| Requirement | Packages |
+|---|---|
+| Any platform | bash-watchdog, verify-gate, model-identity, sanitize-tool-call-ids, force-websearch-defaults, xai-imagine, normalize-images, cap-session-watchdog, custom-header, gpt-img |
+| Windows + WSL | winshot, cursor, recordly |
+| Windows, WSL, or macOS | paster |
+| ffmpeg on PATH | normalize-images, gpt-img, winshot |
+
+The three Windows packages shell out to `powershell.exe` through WSL interop.
+They need nothing installed on the Linux side, but they do nothing on a native
+Linux machine. pi-paster additionally supports macOS; only plain Linux is
+unsupported, since there is no clipboard image source to read.
+
 ## Packages
 
 ### 🛡️ Reliability and guards
@@ -36,20 +57,22 @@ Long image-heavy sessions eat your context window. These keep the outbound provi
 
 | Package | What it does |
 |---------|--------------|
-| **[pi-normalize-images](./packages/pi-normalize-images)** | Downscales and re-encodes every image in the outbound context via ffmpeg (bounded long edge, SHA1 cache, placeholder for undecodable images). |
+| **[pi-normalize-images](./packages/pi-normalize-images)** | Downscales and re-encodes every image in the outbound context via ffmpeg (bounded long edge, SHA1 cache, placeholder for undecodable images). Goes further than pi's built-in `images.autoResize`, which only covers attachments, `read`, and tool results. |
 | **[pi-cap-session-watchdog](./packages/pi-cap-session-watchdog)** | On-disk session GC: finds idle oversized session JSONL files, caps stale images and trims live context via bundled scripts, with cross-process debounce and backup pruning. |
-| **[pi-context-image-cap](https://github.com/Blue-B/pi-context-image-cap)** ↗ | Drops all but the most recent image from the outbound context. Standalone repo; pairs perfectly with pi-normalize-images (cap drops the stale ones, normalize shrinks the survivors). |
+| **[pi-context-image-cap](https://github.com/Blue-B/pi-context-image-cap)** ↗ | Drops all but the most recent image from the outbound context. Standalone repo; pairs with pi-normalize-images (cap drops the stale ones, normalize shrinks the survivors). |
 
 ### 🎨 Media and input
 
+The Windows three (winshot, cursor, recordly) compose: see the screen, act on it, record the result.
+
 | Package | What it does |
 |---------|--------------|
+| **[pi-winshot](./packages/pi-winshot)** | Capture and edit the Windows host screen: full screen, region, monitor, or a single window even when it is buried behind other windows. Crop, resize, and mask private regions before the image reaches the model. |
+| **[pi-cursor](./packages/pi-cursor)** | Drive the Windows mouse and keyboard: focus a window, move the cursor with natural easing, click, type. Pure PowerShell, no AutoHotkey. |
+| **[pi-recordly](./packages/pi-recordly)** | Control the [Recordly](https://recordly.dev) screen recorder: start and stop recordings, target a single window, read status. |
 | **[pi-paster](./packages/pi-paster)** | Turns pasted, drag-dropped, or clipboard-provided image paths into first-class image attachments. |
-| **[pi-winshot](./packages/pi-winshot)** | Capture and edit the Windows host screen from a WSL-hosted pi agent: full screen, region, window (even occluded), crop, resize, privacy masking. |
 | **[pi-gpt-img](./packages/pi-gpt-img)** | `gpt_img` tool: text-to-image and image-to-image via the ChatGPT Codex OAuth backend (gpt-image-2), reusing the OAuth token pi already stores. |
 | **[pi-xai-imagine](./packages/pi-xai-imagine)** | `xai_generate_video` tool: text-to-video and image-to-video via the xAI Grok Imagine API, with OAuth auto-refresh and polling until the MP4 is ready. |
-| **[pi-cursor](./packages/pi-cursor)** | Drive the Windows mouse and keyboard from WSL: focus a window, move the cursor with natural easing, click, type. Pure PowerShell, no AutoHotkey. |
-| **[pi-recordly](./packages/pi-recordly)** | Control the Recordly screen recorder on Windows: start and stop recordings, pick a window or screen source, read status. |
 
 ### 🖥️ TUI
 
@@ -57,41 +80,50 @@ Long image-heavy sessions eat your context window. These keep the outbound provi
 |---------|--------------|
 | **[pi-custom-header](./packages/pi-custom-header)** | Replace pi's built-in startup banner with your own ASCII logo and keybinding hints. Ships as an easy-to-edit template. |
 
-### 🌐 Related standalone repos
-
-Published separately because they are bigger than a single extension:
-
-| Repo | What it does |
-|------|--------------|
-| **[browser-harness-kit](https://github.com/Blue-B/browser-harness-kit)** ↗ | One-command setup for driving a stealth Chromium (CloakBrowser) from 8+ coding agents, including pi. |
-| **[pi-context-image-cap](https://github.com/Blue-B/pi-context-image-cap)** ↗ | Context image capping as a standalone package (see above). |
-
 ---
 
 ## Install
 
-```bash
-# From the repo root, install a specific package
-pi install ./packages/pi-verify-gate
-pi install ./packages/pi-bash-watchdog
+These packages are not published to npm. Install them straight from GitHub:
 
-# Or from GitHub directly
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-verify-gate
+```bash
+pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-winshot
 ```
 
-After install, run `/reload` in pi to activate.
+Or clone once and install from disk, which is easier if you plan to edit them:
 
-Every package is self-contained: install only what you need, nothing depends on the others.
+```bash
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
+pi install ./packages/pi-verify-gate
+```
+
+Run `/reload` in pi afterwards to activate.
+
+Every package is self-contained. Install only what you need; nothing depends on
+anything else here.
 
 ## Requirements
 
 - [pi coding agent](https://github.com/earendil-works/pi-coding-agent) >= 0.70
 - Node.js >= 18
-- Package-specific extras are listed in each package's README (e.g. ffmpeg for pi-normalize-images, an OAuth login for pi-gpt-img / pi-xai-imagine).
+- Windows 10/11 with WSL2 and interop enabled, for winshot, cursor, and recordly
+- ffmpeg on `PATH`, for the three that process images
+- An OAuth login for pi-gpt-img (ChatGPT/Codex) and pi-xai-imagine (xAI)
 
-## Why a monorepo?
+Each package README lists its own extras.
 
-These extensions are small, share the same conventions, and evolve together with day-to-day pi usage. One repo keeps versioning, issues, and discovery in one place, while each package stays independently installable.
+## Why a monorepo
+
+These extensions are small, share the same conventions, and evolve together with
+day-to-day pi usage. One repo keeps versioning, issues, and discovery in one
+place, while each package stays independently installable.
+
+## Contributing
+
+Issues and pull requests are welcome. These started as personal fixes, so if a
+package half-works for your setup, that is worth reporting; the assumptions
+baked in are probably mine rather than pi's.
 
 ## License
 
