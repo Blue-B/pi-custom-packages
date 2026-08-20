@@ -1,6 +1,6 @@
 # pi-cursor
 
-> Let your WSL-hosted [pi coding agent](https://github.com/earendil-works/pi-coding-agent) drive the **Windows mouse and keyboard** — focus a window, move the cursor with natural easing, click, and type.
+> Let your WSL-hosted [pi coding agent](https://github.com/earendil-works/pi) drive the **Windows mouse and keyboard** — focus a window, move the cursor with natural easing, click, and type.
 
 **Zero external dependencies.** No AutoHotkey, no nircmd, no Python, no native modules. Just `powershell.exe` + .NET that already ship with Windows.
 
@@ -54,7 +54,7 @@ Coordinates are absolute screen pixels with the origin at the top-left of the vi
 ## Requirements
 
 - Windows 10/11 with WSL2, interop enabled (`powershell.exe` reachable from WSL)
-- [pi coding agent](https://github.com/earendil-works/pi-coding-agent), tested on 0.84
+- [pi coding agent](https://github.com/earendil-works/pi), tested on 0.84
 - Node.js >= 18
 
 ## License

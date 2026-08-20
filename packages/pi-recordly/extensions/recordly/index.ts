@@ -4,7 +4,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 const RECORDLY_URL = process.env.RECORDLY_URL ?? "http://127.0.0.1:17373";
-const RECORDLY_PROJECT_DIR = "C:\\Users\\root\\projects\\recordly";
+// Optional Windows path to a local Recordly source checkout. When set, the
+// extension starts it with `npm run dev` on first use instead of requiring the
+// app to be already running. Unset means "never auto-start".
+const RECORDLY_PROJECT_DIR = process.env.RECORDLY_PROJECT_DIR ?? "";
 
 // Pi runs in WSL here; Windows-side 127.0.0.1 is not reachable from WSL
 // (localhost relay is off), so requests go through the Windows curl.exe via
@@ -118,6 +121,12 @@ function launchRecordlyDev(): void {
 async function ensureRunning(): Promise<void> {
   if (await isHealthy()) {
     return;
+  }
+  if (!RECORDLY_PROJECT_DIR) {
+    throw new Error(
+      `Recordly is not responding at ${RECORDLY_URL}. Start the Recordly app first, ` +
+        "or set RECORDLY_PROJECT_DIR to a local Recordly checkout so this extension can start it.",
+    );
   }
   if (!launchAttempted) {
     launchAttempted = true;

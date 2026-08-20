@@ -1,6 +1,6 @@
 # pi-winshot
 
-> Let your WSL-hosted [pi coding agent](https://github.com/earendil-works/pi-mono) see and edit your **Windows desktop** — capture any window (even when occluded), crop, resize, and mask sensitive regions for safe sharing.
+> Let your WSL-hosted [pi coding agent](https://github.com/earendil-works/pi) see and edit your **Windows desktop** — capture any window (even when occluded), crop, resize, and mask sensitive regions for safe sharing.
 
 **Zero external dependencies.** No nircmd, no ShareX, no Python, no Node native modules. Just `powershell.exe` + .NET `System.Drawing` that already ship with Windows.
 

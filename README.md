@@ -2,13 +2,13 @@
 
 # pi-custom-packages
 
-**A curated monorepo of extensions for the [pi coding agent](https://github.com/earendil-works/pi-coding-agent).**
+**A curated monorepo of extensions for the [pi coding agent](https://github.com/earendil-works/pi).**
 
 Guards that keep long sessions healthy, media tools that give pi eyes and hands,
 and quality gates that catch the agent's mistakes before you do.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi-coding-agent)
+[![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
 [![Packages](https://img.shields.io/badge/packages-12-success)]()
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)]()
 
@@ -98,7 +98,7 @@ anything else here.
 
 ## Requirements
 
-- [pi coding agent](https://github.com/earendil-works/pi-coding-agent), tested on 0.84
+- [pi coding agent](https://github.com/earendil-works/pi), tested on 0.84
 - Node.js >= 18
 - Windows 10/11 with WSL2 and interop enabled, for winshot, cursor, and recordly
 - ffmpeg on `PATH`, for the three that process images
