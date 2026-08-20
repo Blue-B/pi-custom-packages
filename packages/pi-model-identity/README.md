@@ -1,12 +1,42 @@
 # pi-model-identity
 
-> Injects the live model identity (provider/model id) as a system reminder on first turn, on model switch, and after compaction, so the model never hallucinates which model it is.
+> Injects the live model identity (provider/model id) as a system reminder on first turn, on model switch, and after compaction, so a model that takes over a session mid-way does not answer with the previous model's name.
 
 ## Why
 
-An LLM cannot introspect which weights are serving it — it only "knows" its model name if something puts that name into its context. The AGENTS.md identity line has a literal `<model>` placeholder that nothing substitutes, and provider-specific hooks only fire for their own provider. When you switch to a model outside those hooks, no hook fires and the model has zero idea what it is — it may parrot a hardcoded name from the prompt.
+A model cannot introspect its own weights. It only "knows" its name if something
+puts that name in its context, and pi does not: `buildSystemPrompt()` in pi 0.84
+takes a cwd, tools, skills and context files, and no model at all.
 
-`pi-model-identity` is provider-agnostic. Every turn it reads the live model from `ctx.model` and, whenever the identity could be stale (first turn, model switch, after compaction), injects a tiny system-reminder stating the exact running model. Result: switch to any model → that model accurately knows what it is.
+Some providers fill the gap on their own. Claude Code's binary, which
+`pi-claude-bridge` runs behind the scenes, states the model in its own system
+prompt, so a Claude session usually gets this right unaided. That injection
+never fires for other providers, and more importantly it is written once and
+not refreshed. Switch models halfway through a session and the transcript still
+carries the old name, which is what the next model reads and repeats.
+
+## Measured
+
+The same session, tested with the extension on and off. First turn asks the
+model to identify itself, then the session is handed to a second model and
+asked again.
+
+| Extension | First model | Handed to | Second model answered |
+|---|---|---|---|
+| on | gpt-5.6-sol | claude-opus-5 | `claude-bridge/claude-opus-5` |
+| off | gpt-5.6-sol | claude-opus-5 | `gpt-5.6-sol` |
+| off | gpt-5.6-sol | grok-4.5 | `grok-4.6` |
+| off | claude-opus-5 | gpt-5.6-sol | `gpt-5.6-sol` |
+
+The second row is the failure this exists for: Opus read the earlier turns,
+found a model name there, and reported it as its own. The third row is a softer
+version, where the model tracked the switch but got the version wrong. The last
+row shows it does not break on every handoff, so a single-model session is not
+the case to judge this on.
+
+Every turn the extension reads the live model from `ctx.model` and injects a
+short system reminder whenever the identity could be stale: the first turn, a
+model switch, and the turn after a compaction, since a summary can drop it.
 
 ## Install
 

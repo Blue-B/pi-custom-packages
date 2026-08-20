@@ -2,18 +2,31 @@
  * model-identity.ts
  *
  * ─── WHY ─────────────────────────────────────────────────────────────────────
- * An LLM cannot introspect which weights are serving it — it only "knows" its
- * model name if something puts that name into its context. The AGENTS.md identity
- * line ('I am pi, currently running <model>') has a LITERAL `<model>` placeholder
- * that nothing substitutes, and the three provider-specific rules hooks
- * (claude-bridge / openai-codex / xai-grok) only fire for THEIR provider. So when
- * you switch to e.g. `opencode/nemotron-3-ultra-free`, no hook fires and the model
- * has zero idea what it is — it parrots the hardcoded "opus-4-8" from the prompt.
+ * A model cannot introspect its own weights. It only "knows" its name if
+ * something puts that name into its context, and pi does not: buildSystemPrompt()
+ * in pi 0.84 takes cwd, tools, skills and context files, and no model.
+ *
+ * Some providers cover this themselves. The Claude Code binary that
+ * pi-claude-bridge drives states the model in its own system prompt, so a Claude
+ * session usually gets this right unaided. That never fires for other providers,
+ * and it is written once rather than refreshed, so after a mid-session switch the
+ * transcript still carries the old name for the next model to read and repeat.
+ *
+ * ─── MEASURED (2026-08-20, pi 0.84.2) ────────────────────────────────────────
+ * Same session, asked "which model are you" on turn 1, handed to a second model,
+ * asked again:
+ *
+ *   ON   gpt-5.6-sol -> claude-opus-5   answered "claude-bridge/claude-opus-5"
+ *   OFF  gpt-5.6-sol -> claude-opus-5   answered "gpt-5.6-sol"      <- the bug
+ *   OFF  gpt-5.6-sol -> grok-4.5        answered "grok-4.6"         <- wrong ver
+ *   OFF  claude-opus-5 -> gpt-5.6-sol   answered "gpt-5.6-sol"      <- fine
+ *
+ * It does not break on every handoff, so a single-model session is not the case
+ * to judge this on.
  *
  * This extension is PROVIDER-AGNOSTIC. Every turn it reads the LIVE model from
  * `ctx.model` and, whenever the identity could be stale, injects a tiny
- * system-reminder stating the exact running model. Result: switch to any model →
- * that model accurately knows what it is.
+ * system-reminder stating the exact running model.
  *
  * ─── WHEN IT INJECTS (cheap: only when identity could be wrong) ───────────────
  *   - first turn of the session
