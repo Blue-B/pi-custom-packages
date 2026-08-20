@@ -11,18 +11,16 @@ An LLM cannot introspect which weights are serving it — it only "knows" its mo
 ## Install
 
 ```bash
-# From the repo root
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
 pi install ./packages/pi-model-identity
-
-# Or from GitHub directly
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-model-identity
 ```
 
 After install, run `/reload` in pi to activate.
 
 ### Requirements
 
-- pi coding agent >= 0.70
+- pi coding agent, tested on 0.84
 
 ## Usage
 

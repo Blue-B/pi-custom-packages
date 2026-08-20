@@ -25,26 +25,23 @@ WSL-based AI agents (pi, Claude Code in WSL, Codex, opencode, …) live in a Lin
 ## Install
 
 ```bash
-pi install pi-winshot
-/reload
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
+pi install ./packages/pi-winshot
 ```
 
-or from a clone:
-
-```bash
-git clone https://github.com/Blue-B/pi-winshot
-pi install ./pi-winshot
-/reload
-```
+Then run `/reload` in pi.
 
 ### Requirements
+
 - Windows 10 / 11 host with `powershell.exe` on `PATH` (the default).
 - WSL2 distro (any). `pi-winshot` autodetects WSL via `/proc/version`.
-- pi coding agent ≥ 0.70.
+- pi coding agent, tested on 0.84.
 
 ## Usage
 
 ### Natural language
+
 - "Take a screenshot of my Chrome window"
 - "Capture the active window"
 - "Show me the right half of my main monitor"
@@ -105,6 +102,7 @@ The `window` mode does not call `BitBlt`-on-screen. It calls Win32 `PrintWindow(
 ```
 
 Caveats:
+
 - Minimized windows → pass `bring_to_front=true` so we `ShowWindow(SW_RESTORE)` first.
 - DRM-protected video (Netflix, some players) → returns a black frame; this is a Windows DRM property, not a bug.
 - A handful of OpenGL/legacy games render via direct presentation and produce partial-black output — fall back to `bring_to_front=true`.

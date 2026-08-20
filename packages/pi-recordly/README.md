@@ -25,7 +25,9 @@ Pairs well with [pi-cursor](../pi-cursor) (drive the demo) and [pi-winshot](../p
 ## Install
 
 ```bash
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-recordly
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
+pi install ./packages/pi-recordly
 ```
 
 Then run `/reload` in pi.
@@ -51,7 +53,7 @@ Auto-zoom keys off interaction, so a recording where nothing is clicked stays fl
 
 - Windows 10/11 with WSL2, interop enabled
 - [Recordly](https://recordly.dev) installed on Windows
-- [pi coding agent](https://github.com/earendil-works/pi-coding-agent) >= 0.70
+- [pi coding agent](https://github.com/earendil-works/pi-coding-agent), tested on 0.84
 - Node.js >= 18
 
 ## License

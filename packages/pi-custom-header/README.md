@@ -13,18 +13,16 @@ No config files, no theme overrides, no build step. Edit the file, reload, done.
 ## Install
 
 ```bash
-# From the repo root
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
 pi install ./packages/pi-custom-header
-
-# Or from GitHub directly
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-custom-header
 ```
 
 After install, run `/reload` in pi to activate.
 
 ## Requirements
 
-- pi coding agent >= 0.70
+- pi coding agent, tested on 0.84
 - TUI mode (`pi` with a terminal UI, not `pi --no-tui`)
 
 ## Usage

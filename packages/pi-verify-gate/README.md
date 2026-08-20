@@ -18,18 +18,16 @@ The suspect no longer selects the target or supplies the evidence. The extension
 ## Install
 
 ```bash
-# From the repo root
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
 pi install ./packages/pi-verify-gate
-
-# Or from GitHub directly
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-verify-gate
 ```
 
 After install, run `/reload` in pi to activate.
 
 ### Requirements
 
-- pi coding agent >= 0.70
+- pi coding agent, tested on 0.84
 - A builtin `reviewer` subagent available in your pi install
 
 ## Usage

@@ -33,18 +33,16 @@ the model-window ceiling — a trap the disk-size check is blind to.
 ## Install
 
 ```bash
-# From the repo root
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
 pi install ./packages/pi-cap-session-watchdog
-
-# Or from GitHub directly
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-cap-session-watchdog
 ```
 
 After install, run `/reload` in pi to activate.
 
 ### Requirements
 
-- pi coding agent >= 0.70
+- pi coding agent, tested on 0.84
 - Node.js >= 18
 
 ## Usage

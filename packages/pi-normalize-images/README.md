@@ -16,18 +16,16 @@ The on-disk session JSONL is never modified (the `context` hook clones the messa
 ## Install
 
 ```bash
-# From the repo root
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
 pi install ./packages/pi-normalize-images
-
-# Or from GitHub directly
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-normalize-images
 ```
 
 After install, run `/reload` in pi to activate.
 
 ### Requirements
 
-- pi coding agent >= 0.70
+- pi coding agent, tested on 0.84
 - ffmpeg on `PATH` or at `~/.local/bin/ffmpeg`
 
 ## Usage

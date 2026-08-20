@@ -18,18 +18,16 @@ It also registers the command `/bash-watchdog-status` so you can inspect the cur
 ## Install
 
 ```bash
-# From the repo root
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
 pi install ./packages/pi-bash-watchdog
-
-# Or from GitHub directly
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-bash-watchdog
 ```
 
 After install, run `/reload` in pi to activate.
 
 ### Requirements
 
-- pi coding agent >= 0.70
+- pi coding agent, tested on 0.84
 
 ## Usage
 

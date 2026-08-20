@@ -14,11 +14,9 @@ This rule is conventionally documented in AGENTS.md, but that is only *probabili
 ## Install
 
 ```bash
-# From the repo root
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
 pi install ./packages/pi-force-websearch-defaults
-
-# Or from GitHub directly
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-force-websearch-defaults
 ```
 
 After install, run `/reload` in pi to activate.
@@ -43,7 +41,7 @@ Delete `extensions/force-websearch-defaults.ts` and run `/reload` in pi (or star
 
 ## Requirements
 
-- pi coding agent >= 0.70
+- pi coding agent, tested on 0.84
 - The [`pi-web-access`](https://github.com/nicobailon/pi-web-access) package (npm `pi-web-access`) providing the `web_search` tool
 
 ## Project layout

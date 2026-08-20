@@ -25,7 +25,9 @@ Pairs well with [pi-winshot](../pi-winshot) (see the screen) and [pi-recordly](.
 ## Install
 
 ```bash
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-cursor
+git clone https://github.com/Blue-B/pi-custom-packages.git
+cd pi-custom-packages
+pi install ./packages/pi-cursor
 ```
 
 Then run `/reload` in pi.
@@ -52,7 +54,7 @@ Coordinates are absolute screen pixels with the origin at the top-left of the vi
 ## Requirements
 
 - Windows 10/11 with WSL2, interop enabled (`powershell.exe` reachable from WSL)
-- [pi coding agent](https://github.com/earendil-works/pi-coding-agent) >= 0.70
+- [pi coding agent](https://github.com/earendil-works/pi-coding-agent), tested on 0.84
 - Node.js >= 18
 
 ## License

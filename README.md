@@ -8,8 +8,8 @@ Guards that keep long sessions healthy, media tools that give pi eyes and hands,
 and quality gates that catch the agent's mistakes before you do.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![pi](https://img.shields.io/badge/pi-%3E%3D%200.70-8A2BE2)](https://github.com/earendil-works/pi-coding-agent)
-[![Packages](https://img.shields.io/badge/packages-14-success)]()
+[![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi-coding-agent)
+[![Packages](https://img.shields.io/badge/packages-12-success)]()
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)]()
 
 </div>
@@ -27,15 +27,13 @@ and therefore need WSL with interop enabled.
 
 | Requirement | Packages |
 |---|---|
-| Any platform | bash-watchdog, verify-gate, model-identity, sanitize-tool-call-ids, force-websearch-defaults, xai-imagine, normalize-images, cap-session-watchdog, custom-header, gpt-img |
+| Any platform | bash-watchdog, verify-gate, model-identity, sanitize-tool-call-ids, force-websearch-defaults, normalize-images, cap-session-watchdog, custom-header, gpt-img |
 | Windows + WSL | winshot, cursor, recordly |
-| Windows, WSL, or macOS | paster |
 | ffmpeg on PATH | normalize-images, gpt-img, winshot |
 
 The three Windows packages shell out to `powershell.exe` through WSL interop.
 They need nothing installed on the Linux side, but they do nothing on a native
-Linux machine. pi-paster additionally supports macOS; only plain Linux is
-unsupported, since there is no clipboard image source to read.
+Linux machine.
 
 ## Packages
 
@@ -70,9 +68,7 @@ The Windows three (winshot, cursor, recordly) compose: see the screen, act on it
 | **[pi-winshot](./packages/pi-winshot)** | Capture and edit the Windows host screen: full screen, region, monitor, or a single window even when it is buried behind other windows. Crop, resize, and mask private regions before the image reaches the model. |
 | **[pi-cursor](./packages/pi-cursor)** | Drive the Windows mouse and keyboard: focus a window, move the cursor with natural easing, click, type. Pure PowerShell, no AutoHotkey. |
 | **[pi-recordly](./packages/pi-recordly)** | Control the [Recordly](https://recordly.dev) screen recorder: start and stop recordings, target a single window, read status. |
-| **[pi-paster](./packages/pi-paster)** | Turns pasted, drag-dropped, or clipboard-provided image paths into first-class image attachments. |
 | **[pi-gpt-img](./packages/pi-gpt-img)** | `gpt_img` tool: text-to-image and image-to-image via the ChatGPT Codex OAuth backend (gpt-image-2), reusing the OAuth token pi already stores. |
-| **[pi-xai-imagine](./packages/pi-xai-imagine)** | `xai_generate_video` tool: text-to-video and image-to-video via the xAI Grok Imagine API, with OAuth auto-refresh and polling until the MP4 is ready. |
 
 ### 🖥️ TUI
 
@@ -84,18 +80,15 @@ The Windows three (winshot, cursor, recordly) compose: see the screen, act on it
 
 ## Install
 
-These packages are not published to npm. Install them straight from GitHub:
-
-```bash
-pi install https://github.com/Blue-B/pi-custom-packages/tree/main/packages/pi-winshot
-```
-
-Or clone once and install from disk, which is easier if you plan to edit them:
+These packages are not published to npm, and `pi install` does not accept a
+subdirectory of a repository. Clone once, then install the packages you want
+from disk:
 
 ```bash
 git clone https://github.com/Blue-B/pi-custom-packages.git
 cd pi-custom-packages
 pi install ./packages/pi-verify-gate
+pi install ./packages/pi-winshot
 ```
 
 Run `/reload` in pi afterwards to activate.
@@ -105,11 +98,11 @@ anything else here.
 
 ## Requirements
 
-- [pi coding agent](https://github.com/earendil-works/pi-coding-agent) >= 0.70
+- [pi coding agent](https://github.com/earendil-works/pi-coding-agent), tested on 0.84
 - Node.js >= 18
 - Windows 10/11 with WSL2 and interop enabled, for winshot, cursor, and recordly
 - ffmpeg on `PATH`, for the three that process images
-- An OAuth login for pi-gpt-img (ChatGPT/Codex) and pi-xai-imagine (xAI)
+- An OAuth login for pi-gpt-img (ChatGPT/Codex)
 
 Each package README lists its own extras.
 
