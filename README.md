@@ -9,7 +9,7 @@ and quality gates that catch the agent's mistakes before you do.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
-[![Packages](https://img.shields.io/badge/packages-12-success)]()
+[![Packages](https://img.shields.io/badge/packages-13-success)]()
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)]()
 
 </div>
@@ -29,6 +29,7 @@ and therefore need WSL with interop enabled.
 |---|---|
 | Any platform | bash-watchdog, verify-gate, model-identity, sanitize-tool-call-ids, force-websearch-defaults, normalize-images, cap-session-watchdog, custom-header, gpt-img |
 | Windows + WSL | winshot, cursor, recordly |
+| [herdr](https://herdr.dev) with the Pi integration installed | herdr-ask-blocked |
 | ffmpeg on PATH | normalize-images, gpt-img, winshot |
 
 The three Windows packages shell out to `powershell.exe` through WSL interop.
@@ -76,6 +77,12 @@ The Windows three (winshot, cursor, recordly) compose: see the screen, act on it
 |---------|--------------|
 | **[pi-custom-header](./packages/pi-custom-header)** | Replace pi's built-in startup banner with your own ASCII logo and keybinding hints. Ships as an easy-to-edit template. |
 
+### 🔗 Integrations
+
+| Package | What it does |
+|---------|--------------|
+| **[pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked)** | Makes [herdr](https://herdr.dev)'s sidebar show a pane as blocked (not working) while pi waits on an `ask_user_question` answer, instead of leaving it stuck on yellow the whole time. Requires herdr with the Pi integration installed. |
+
 ---
 
 ## Install
@@ -103,6 +110,7 @@ anything else here.
 - Windows 10/11 with WSL2 and interop enabled, for winshot, cursor, and recordly
 - ffmpeg on `PATH`, for the three that process images
 - An OAuth login for pi-gpt-img (ChatGPT/Codex)
+- [herdr](https://herdr.dev) with the Pi integration installed (`herdr integration install pi`), for pi-herdr-ask-blocked
 
 Each package README lists its own extras.
 

@@ -1,0 +1,39 @@
+{
+  "name": "pi-herdr-ask-blocked",
+  "version": "0.1.0",
+  "description": "Makes herdr's sidebar show \"blocked\" (not \"working\") while pi is waiting on an ask_user_question answer.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "extension",
+    "herdr",
+    "ask-user-question",
+    "sidebar",
+    "status"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-herdr-ask-blocked"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  },
+  "author": ""
+}
