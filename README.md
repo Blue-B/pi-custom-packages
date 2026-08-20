@@ -1,6 +1,6 @@
 # pi-custom-packages
 
-Twelve small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Eleven small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -48,13 +48,12 @@ watch for that.
 ### Context hygiene
 
 pi resends the whole conversation every turn, images included. Twenty screenshots
-means twenty base64 blobs on turn twenty-one. These three attack that from
-different ends, and they compose.
+means twenty base64 blobs on turn twenty-one. One of these works on the outbound
+payload, the other on the file already written to disk.
 
 | Package | What it does |
 |---|---|
 | [pi-cap-context-images](./packages/pi-cap-context-images) | Keeps the newest image in the outbound payload and turns the older ones into short text placeholders. pi's `images.autoResize` shrinks images on the way in; nothing in pi prunes what is already sitting in the context. |
-| [pi-normalize-images](./packages/pi-normalize-images) | Re-encodes and downscales whatever images survive, through ffmpeg, with a SHA1 cache and a placeholder for anything ffmpeg cannot decode. |
 | [pi-cap-session-watchdog](./packages/pi-cap-session-watchdog) | The on-disk half: finds session JSONL files that already grew too large while idle, caps their stale images, trims live context. Debounced across processes, prunes its own backups. |
 
 ### Windows desktop
@@ -80,14 +79,14 @@ WSL interop and install nothing on the Linux side.
 
 ## Platform support
 
-Five of the twelve need nothing beyond pi itself: bash-watchdog,
+Five of the eleven need nothing beyond pi itself: bash-watchdog,
 cap-context-images, cap-session-watchdog, custom-header, and model-identity.
-The other seven each want something specific.
+The other six each want something specific.
 
 | Needs | Packages |
 |---|---|
 | Windows 10/11 with WSL2 and interop | winshot, cursor, recordly |
-| ffmpeg on `PATH` | winshot, normalize-images, gpt-img |
+| ffmpeg on `PATH` | winshot, gpt-img |
 | [pi-subagents](https://www.npmjs.com/package/pi-subagents), for its `reviewer` agent | verify-gate |
 | [herdr](https://herdr.dev) with `herdr integration install pi` | herdr-ask-blocked |
 | A ChatGPT or Codex OAuth login | gpt-img |
