@@ -193,8 +193,7 @@ function extract(entries: AnyEntry[]): Extracted {
 			// (no-match grep, empty command output, successful write) is normal, not a
 			// screenshot — labelling it "image/binary" forced false FAILs. Track it apart.
 			const nonText =
-				Array.isArray(content) &&
-				content.some((c) => c?.type && c.type !== "text");
+				Array.isArray(content) && content.some((c) => c?.type && c.type !== "text");
 			const emptyResult =
 				Array.isArray(content) && content.length > 0 && txt === "" && !nonText;
 			resultById.set(id, {
@@ -253,8 +252,7 @@ function buildEvidenceFile(ex: Extracted, sentinel: string): string {
 	);
 	lines.push(sentinel);
 	lines.push(
-		neutralize(ex.conclusion, sentinel) ||
-			"(직전 assistant 텍스트를 찾지 못함)",
+		neutralize(ex.conclusion, sentinel) || "(직전 assistant 텍스트를 찾지 못함)",
 	);
 	lines.push(sentinel);
 	lines.push("");
