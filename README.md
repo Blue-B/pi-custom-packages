@@ -9,7 +9,7 @@ and quality gates that catch the agent's mistakes before you do.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
-[![Packages](https://img.shields.io/badge/packages-13-success)]()
+[![Packages](https://img.shields.io/badge/packages-14-success)]()
 [![Node](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)]()
 
 </div>
@@ -27,7 +27,7 @@ and therefore need WSL with interop enabled.
 
 | Requirement | Packages |
 |---|---|
-| Any platform | bash-watchdog, verify-gate, model-identity, sanitize-tool-call-ids, force-websearch-defaults, normalize-images, cap-session-watchdog, custom-header, gpt-img |
+| Any platform | bash-watchdog, verify-gate, model-identity, sanitize-tool-call-ids, force-websearch-defaults, normalize-images, cap-context-images, cap-session-watchdog, custom-header, gpt-img |
 | Windows + WSL | winshot, cursor, recordly |
 | [herdr](https://herdr.dev) with the Pi integration installed | herdr-ask-blocked |
 | ffmpeg on PATH | normalize-images, gpt-img, winshot |
@@ -58,7 +58,7 @@ Long image-heavy sessions eat your context window. These keep the outbound provi
 |---------|--------------|
 | **[pi-normalize-images](./packages/pi-normalize-images)** | Downscales and re-encodes every image in the outbound context via ffmpeg (bounded long edge, SHA1 cache, placeholder for undecodable images). Goes further than pi's built-in `images.autoResize`, which only covers attachments, `read`, and tool results. |
 | **[pi-cap-session-watchdog](./packages/pi-cap-session-watchdog)** | On-disk session GC: finds idle oversized session JSONL files, caps stale images and trims live context via bundled scripts, with cross-process debounce and backup pruning. |
-| **[pi-context-image-cap](https://github.com/Blue-B/pi-context-image-cap)** ↗ | Drops all but the most recent image from the outbound context. Standalone repo; pairs with pi-normalize-images (cap drops the stale ones, normalize shrinks the survivors). |
+| **[pi-cap-context-images](./packages/pi-cap-context-images)** | Keeps only the most recent image in the outbound payload and rewrites older ones as text placeholders. pi's own `images.autoResize` shrinks images on the way in but never prunes what is already in the context. Pairs with pi-normalize-images: cap drops the stale ones, normalize shrinks the survivors. |
 
 ### 🎨 Media and input
 

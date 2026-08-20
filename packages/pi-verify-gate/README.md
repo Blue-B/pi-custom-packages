@@ -11,7 +11,7 @@ Agents state decision-grade conclusions (ship / spend / "it works" / metric clai
 1. **Target selection.** It picks the agent's most recent conclusion deterministically, not by asking the agent to choose.
 2. **Evidence gathering.** It pulls the raw tool calls and tool results of that turn verbatim from the session log (the actual outputs, not the agent's paraphrase) and writes them to an evidence file.
 
-Then it dispatches the builtin `reviewer` subagent in a fresh context to read that file directly and grade whether each claim in the conclusion is backed by the raw outputs, returning PASS/FAIL plus the specific gaps. On FAIL the agent must re-run the real tools and correct.
+Then it dispatches the `reviewer` subagent in a fresh context to read that file directly and grade whether each claim in the conclusion is backed by the raw outputs, returning PASS/FAIL plus the specific gaps. On FAIL the agent must re-run the real tools and correct.
 
 The suspect no longer selects the target or supplies the evidence. The extension does, from a log the agent cannot retroactively edit.
 
@@ -28,7 +28,7 @@ After install, run `/reload` in pi to activate.
 ### Requirements
 
 - pi coding agent, tested on 0.84
-- A builtin `reviewer` subagent available in your pi install
+- [pi-subagents](https://www.npmjs.com/package/pi-subagents), which is where the `reviewer` agent comes from. pi core does not ship one, so without this package `/verify` gathers the evidence but has nothing to grade it
 
 ## Usage
 
