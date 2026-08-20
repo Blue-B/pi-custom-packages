@@ -1,6 +1,6 @@
 # pi-custom-packages
 
-Thirteen small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Twelve small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -35,15 +35,14 @@ binary); those are listed with the package and again under
 
 ### Guards
 
-Sessions rarely fail loudly. They fail as a wrong timeout unit, a tool-call ID the
-provider rejects, a model confidently naming the wrong model, a conclusion nobody
-checked. These four watch for that.
+Sessions rarely fail loudly. They fail as a wrong timeout unit, a model
+confidently naming the wrong model, a conclusion nobody checked. These three
+watch for that.
 
 | Package | What it does |
 |---|---|
 | [pi-verify-gate](./packages/pi-verify-gate) | `/verify` (alias `/검증`) pulls the raw tool calls and results of the agent's last turn straight out of the session log, writes them to a file, and has a fresh-context `reviewer` subagent grade the conclusion against them. The agent never picks the target or supplies the evidence. Needs [pi-subagents](https://www.npmjs.com/package/pi-subagents). |
 | [pi-bash-watchdog](./packages/pi-bash-watchdog) | pi's bash timeout is in seconds, and models keep passing milliseconds. Rewrites `120000` to `120`, caps foreground dev servers, fills a default when the field is missing. Adds `/bash-watchdog-status`. |
-| [pi-sanitize-tool-call-ids](./packages/pi-sanitize-tool-call-ids) | Rewrites tool-call IDs to `[a-zA-Z0-9_-]` before each provider request, so a session that switched providers mid-way stops failing schema validation. |
 | [pi-model-identity](./packages/pi-model-identity) | A model cannot introspect its own weights, so it repeats whatever name is in the prompt. Injects the live model ID on the first turn, on a model switch, and after compaction. Ships `model_identity_status`. |
 
 ### Context hygiene
@@ -81,9 +80,9 @@ WSL interop and install nothing on the Linux side.
 
 ## Platform support
 
-Six of the thirteen need nothing beyond pi itself: bash-watchdog,
-cap-context-images, cap-session-watchdog, custom-header, model-identity, and
-sanitize-tool-call-ids. The other seven each want something specific.
+Five of the twelve need nothing beyond pi itself: bash-watchdog,
+cap-context-images, cap-session-watchdog, custom-header, and model-identity.
+The other seven each want something specific.
 
 | Needs | Packages |
 |---|---|
