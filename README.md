@@ -11,6 +11,27 @@ pi could almost do, and the fix turned out small enough to keep around. They liv
 together because they share conventions and get updated in the same afternoon,
 not because they form a system. Take the one you need.
 
+## Six that used to be here
+
+The repo is smaller than it was. Six packages have been deleted, and only one of
+those was because I stopped using it.
+
+Three went because pi grew the feature. `pi-normalize-images` resized tool-result
+images until pi started doing that in [#7330](https://github.com/earendil-works/pi/pull/7330),
+which came out of an issue I filed after finding 39 sessions on one machine
+between 10 MB and 288 MB, the worst of them 99 screenshots and 107 MB of base64
+([#5369](https://github.com/earendil-works/pi/issues/5369)).
+`pi-sanitize-tool-call-ids` rewrote tool-call IDs for Anthropic's
+`^[a-zA-Z0-9_-]+$` rule until `pi-ai` shipped `normalizeToolCallId()` with the
+same regex and the same 64-character cut. `pi-force-websearch-defaults` turned
+out to be two settings.
+
+The remaining three were mine to fix: one was a fork of someone else's work,
+one needed a subscription I dropped, and one only changed the startup logo.
+
+Everything below survived the same check: read pi's source for an equivalent,
+then turn the extension off and see whether anything actually breaks.
+
 ## Install
 
 Nothing here is on npm, and `pi install` will not take a subdirectory of a
