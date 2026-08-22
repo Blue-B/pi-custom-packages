@@ -7,9 +7,9 @@
 ## Why
 
 Long-lived browser sessions accumulate tens of megabytes of stale screenshots
-on disk. The live image hooks (`cap-context-images`, `normalize-images`)
-protect only the outbound wire — they drop stale images from context before
-sending to the LLM — but **never rewrite the**.jsonl file. A session that runs
+on disk. A live image hook such as [pi-cap-context-images](../pi-cap-context-images)
+protects only the outbound wire, dropping stale images from the payload before
+it reaches the LLM, and never rewrites the `.jsonl` file. A session that runs
 for hours still grows past 70 MB, and every compaction re-reads the inflated
 usage metadata, making compaction itself thrash.
 
@@ -106,7 +106,8 @@ include them.
 ```
 pi-cap-session-watchdog/
   extensions/
-    cap-session-watchdog.ts   # the extension (registers session_start handler)
+    cap-session-watchdog/
+      index.ts              # the extension (registers session_start handler)
   scripts/
     cap-session-images.mjs    # image-capping helper (backup → temp → validate → atomic rename)
     cap-session-livesize.mjs  # live-context-size trim helper (checks real context vs ceiling)

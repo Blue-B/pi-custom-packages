@@ -37,8 +37,9 @@ Then run `/reload` in pi.
 
 ## Pairs with
 
-- **[pi-normalize-images](../pi-normalize-images)** — shrinks the images that do survive. Cap drops the stale ones, normalize makes the rest cheap.
-- **[pi-cap-session-watchdog](../pi-cap-session-watchdog)** — repairs session files that already bloated on disk, which this extension deliberately does not touch.
+[pi-cap-session-watchdog](../pi-cap-session-watchdog) repairs session files
+that already bloated on disk, which this extension deliberately does not touch.
+One works on the payload leaving pi, the other on the file already written.
 
 ## Requirements
 
