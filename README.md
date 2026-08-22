@@ -36,8 +36,14 @@ then turn the extension off and see whether anything actually breaks.
 
 ## Install
 
-Nothing here is on npm, and `pi install` will not take a subdirectory of a
-repository, so clone first and install from disk:
+All ten, straight from git:
+
+```bash
+pi install git:github.com/Blue-B/pi-custom-packages
+```
+
+Or one at a time. Nothing here is on npm, and `pi install` will not take a
+subdirectory of a repository, so clone first and install from disk:
 
 ```bash
 git clone https://github.com/Blue-B/pi-custom-packages.git

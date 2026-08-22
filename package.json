@@ -1,0 +1,42 @@
+{
+  "name": "pi-custom-packages",
+  "version": "0.1.0",
+  "description": "Ten extensions for the pi coding agent: session guards, image context control, and Windows/WSL screen capture, cursor, and recording.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill",
+    "pi-coding-agent",
+    "pi"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "pi": {
+    "extensions": [
+      "./packages/pi-bash-watchdog/extensions/bash-watchdog/index.ts",
+      "./packages/pi-cap-context-images/extensions/cap-context-images/index.ts",
+      "./packages/pi-cap-session-watchdog/extensions/cap-session-watchdog/index.ts",
+      "./packages/pi-cursor/extensions/cursor/index.ts",
+      "./packages/pi-gpt-img/extensions/gpt-img/index.ts",
+      "./packages/pi-herdr-ask-blocked/extensions/herdr-ask-blocked/index.ts",
+      "./packages/pi-model-identity/extensions/model-identity/index.ts",
+      "./packages/pi-recordly/extensions/recordly/index.ts",
+      "./packages/pi-verify-gate/extensions/verify-gate/index.ts",
+      "./packages/pi-winshot/extensions/winshot/index.ts"
+    ],
+    "skills": [
+      "./packages/pi-winshot/skills/winshot"
+    ]
+  }
+}
