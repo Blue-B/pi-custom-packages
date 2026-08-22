@@ -1,6 +1,6 @@
 # pi-custom-packages
 
-Eleven small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Ten small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -74,14 +74,13 @@ WSL interop and install nothing on the Linux side.
 | Package | What it does |
 |---|---|
 | [pi-gpt-img](./packages/pi-gpt-img) | A `gpt_img` tool for text-to-image and image-to-image on gpt-image-2, reusing the ChatGPT/Codex OAuth token pi already holds. |
-| [pi-custom-header](./packages/pi-custom-header) | Swaps pi's startup banner for your own ASCII logo and key hints. Ships as a template meant to be edited. |
 | [pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked) | [herdr](https://herdr.dev)'s sidebar shows a pane as working the entire time pi is actually waiting on an `ask_user_question` answer. This emits the blocked event herdr's own integration already listens for. |
 
 ## Platform support
 
-Five of the eleven need nothing beyond pi itself: bash-watchdog,
-cap-context-images, cap-session-watchdog, custom-header, and model-identity.
-The other six each want something specific.
+Four of the ten need nothing beyond pi itself: bash-watchdog,
+cap-context-images, cap-session-watchdog, and model-identity. The other six
+each want something specific.
 
 | Needs | Packages |
 |---|---|
