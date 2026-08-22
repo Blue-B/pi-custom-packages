@@ -1,5 +1,7 @@
 # pi-custom-packages
 
+![pi-custom-packages](./assets/banner.png)
+
 Ten small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
