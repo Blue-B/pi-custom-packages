@@ -57,9 +57,16 @@ function countLiveRuns(sessionPath: string | undefined): number | null {
   let live = 0;
   const now = Date.now();
   for (const entry of entries) {
+    const file = path.join(dir, entry, "status.json");
+    // Finished runs never get rewritten; skip them without reading.
+    try {
+      if (now - fs.statSync(file).mtimeMs > STALE_MS) continue;
+    } catch {
+      continue;
+    }
     let raw: string;
     try {
-      raw = fs.readFileSync(path.join(dir, entry, "status.json"), "utf8");
+      raw = fs.readFileSync(file, "utf8");
     } catch {
       continue;
     }
@@ -100,9 +107,7 @@ function sendOnce(socketPath: string, request: unknown): Promise<boolean> {
       resolve(delivered);
     };
     socket.on("error", () => finish(false));
-    socket.on("connect", () =>
-      socket.write(`${JSON.stringify(request)}\n`),
-    );
+    socket.on("connect", () => socket.write(`${JSON.stringify(request)}\n`));
     socket.on("data", () => finish(true));
     socket.on("end", () => finish(false));
     setTimeout(() => finish(false), 800).unref?.();
@@ -189,7 +194,9 @@ export default function (pi: ExtensionAPI) {
           socketPath!,
           paneId!,
           "working",
-          live === 1 ? "서브에이전트 실행 중" : `서브에이전트 ${live}개 실행 중`,
+          live === 1
+            ? "서브에이전트 실행 중"
+            : `서브에이전트 ${live}개 실행 중`,
         );
       }
     } else if (reporting) {
