@@ -2,7 +2,7 @@
 
 ![pi-custom-packages](./assets/banner.png)
 
-Ten small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Eleven small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -36,7 +36,7 @@ then turn the extension off and see whether anything actually breaks.
 
 ## Install
 
-All ten, straight from git:
+All eleven, straight from git:
 
 ```bash
 pi install git:github.com/Blue-B/pi-custom-packages
@@ -102,14 +102,15 @@ WSL interop and install nothing on the Linux side.
 
 | Package | What it does |
 |---|---|
+| [pi-auto-continue](./packages/pi-auto-continue) | pi retries a dropped stream three times, then the turn dies and you type "continue" by hand. This queues the resume itself at exactly that moment — transient transport errors only (`network_error`, timeouts, 429/5xx), capped so a hard outage cannot loop forever. |
 | [pi-gpt-img](./packages/pi-gpt-img) | A `gpt_img` tool for text-to-image and image-to-image on gpt-image-2, reusing the ChatGPT/Codex OAuth token pi already holds. |
 | [pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked) | [herdr](https://herdr.dev)'s sidebar shows a pane as working the entire time pi is actually waiting on an `ask_user_question` answer. This emits the blocked event herdr's own integration already listens for. |
 
 ## Platform support
 
-Four of the ten need nothing beyond pi itself: bash-watchdog,
-cap-context-images, cap-session-watchdog, and model-identity. The other six
-each want something specific.
+Five of the eleven need nothing beyond pi itself: auto-continue,
+bash-watchdog, cap-context-images, cap-session-watchdog, and model-identity. The
+other six each want something specific.
 
 | Needs | Packages |
 |---|---|

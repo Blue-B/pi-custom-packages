@@ -1,7 +1,7 @@
 {
   "name": "pi-custom-packages",
   "version": "0.1.0",
-  "description": "Ten extensions for the pi coding agent: session guards, image context control, and Windows/WSL screen capture, cursor, and recording.",
+  "description": "Eleven extensions for the pi coding agent: session guards, image context control, and Windows/WSL screen capture, cursor, and recording.",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -24,6 +24,7 @@
   },
   "pi": {
     "extensions": [
+      "./packages/pi-auto-continue/extensions/auto-continue.ts",
       "./packages/pi-bash-watchdog/extensions/bash-watchdog/index.ts",
       "./packages/pi-cap-context-images/extensions/cap-context-images/index.ts",
       "./packages/pi-cap-session-watchdog/extensions/cap-session-watchdog/index.ts",
