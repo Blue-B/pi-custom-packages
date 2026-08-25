@@ -1,33 +1,47 @@
-// herdr's official Pi integration (herdr-agent-state.ts, installed by
-// `herdr integration install pi`) only tracks this process's agent_start /
-// agent_settled lifecycle. The moment the parent turn ends, the pane flips to
-// "idle"/done even though an async subagent child is still running in a
-// separate headless process, and the token counters freeze with it.
+// Replacement for herdr's official Pi state reporter that also keeps the pane
+// working while async pi-subagents children owned by this session are live.
 //
-// This extension polls pi-subagents' async run state and reports "working"
-// to herdr over its Unix socket while one of THIS session's children is live.
-//
-// It deliberately reports under a separate source id ("herdr:pi-subagents")
-// instead of reusing "herdr:pi": herdr keeps per-source monotonic sequence
-// numbers and rejects anything older, so a second reporter on the official
-// source would permanently poison the integration's future reports.
-// When the last child finishes we release our authority again so the official
-// integration stays in charge.
-//
-// Same bug class tracked upstream:
-// https://github.com/herdrdev/herdr/issues/2354 (agy panes report idle)
-// https://github.com/herdrdev/herdr/issues/3052 (OpenCode subagent states)
-import net from "node:net";
+// This must be the only reporter using herdr's official `herdr:pi` source.
+// Running it beside herdr-agent-state.ts creates two independent sequence clocks,
+// so installation disables that managed extension through Pi's resource config.
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
-const SOURCE = "herdr:pi-subagents";
+const SOURCE = "herdr:pi";
 const POLL_MS = 3000;
-const HEARTBEAT_MS = 15000;
-// Runs whose writer stopped touching status.json for this long are treated as
-// crashed, not running. Prevents a stuck "working" forever.
 const STALE_MS = 10 * 60_000;
+
+type AgentState = "working" | "blocked" | "idle";
+
+type QueuedState = {
+  state: AgentState;
+  message?: string;
+  seq: number;
+};
+
+type SessionRefParams = {
+  agent_session_id?: string;
+  agent_session_path?: string;
+};
+
+type HerdrRequest = {
+  id: string;
+  method: "pane.report_agent" | "pane.report_agent_session";
+  params: SessionRefParams & {
+    pane_id: string;
+    source: string;
+    agent: string;
+    seq: number;
+    state?: AgentState;
+    message?: string;
+    session_start_source?: string;
+  };
+};
 
 interface RunStatus {
   sessionId?: string;
@@ -35,175 +49,282 @@ interface RunStatus {
   lastActivityAt?: number;
 }
 
-interface SessionRef {
-  getSessionFile?: () => unknown;
-}
-
-function runsDir(): string | null {
-  if (typeof process.getuid !== "function") return null;
-  return `/tmp/pi-subagents-uid-${process.getuid()}/async-subagent-runs`;
+function defaultRunsDir(): string | null {
+  const uid = process.getuid?.();
+  return uid === undefined
+    ? null
+    : `/tmp/pi-subagents-uid-${uid}/async-subagent-runs`;
 }
 
 /** Number of this session's live async child runs, or null when unknowable. */
-function countLiveRuns(sessionPath: string | undefined): number | null {
-  const dir = runsDir();
-  if (!dir || !sessionPath) return null;
+export function countLiveRuns(
+  sessionPath: string | undefined,
+  runsDirectory = defaultRunsDir(),
+  now = Date.now(),
+): number | null {
+  if (!runsDirectory || !sessionPath) return null;
+
   let entries: string[];
   try {
-    entries = fs.readdirSync(dir);
+    entries = fs.readdirSync(runsDirectory);
   } catch {
     return null;
   }
+
   let live = 0;
-  const now = Date.now();
   for (const entry of entries) {
-    const file = path.join(dir, entry, "status.json");
-    // Finished runs never get rewritten; skip them without reading.
+    const file = path.join(runsDirectory, entry, "status.json");
     try {
       if (now - fs.statSync(file).mtimeMs > STALE_MS) continue;
     } catch {
       continue;
     }
-    let raw: string;
+
     try {
-      raw = fs.readFileSync(file, "utf8");
+      const status = JSON.parse(fs.readFileSync(file, "utf8")) as RunStatus;
+      const sessionId = status.sessionId;
+      const lastActivityAt = status.lastActivityAt;
+      if (
+        status.state === "running" &&
+        sessionId &&
+        path.resolve(sessionId) === path.resolve(sessionPath) &&
+        Number.isFinite(lastActivityAt) &&
+        now - (lastActivityAt ?? 0) <= STALE_MS
+      ) {
+        live += 1;
+      }
     } catch {
-      continue;
     }
-    let status: RunStatus;
-    try {
-      status = JSON.parse(raw) as RunStatus;
-    } catch {
-      continue;
-    }
-    if (status.state !== "running") continue;
-    if (
-      typeof status.sessionId !== "string" ||
-      path.resolve(status.sessionId) !== path.resolve(sessionPath)
-    ) {
-      continue;
-    }
-    if (
-      typeof status.lastActivityAt !== "number" ||
-      now - status.lastActivityAt > STALE_MS
-    ) {
-      continue;
-    }
-    live += 1;
   }
+
   return live;
 }
 
-let seq = Date.now() * 1000;
-
-function sendOnce(socketPath: string, request: unknown): Promise<boolean> {
+function sendRequestAttempt(
+  socketEndpoint: string,
+  request: HerdrRequest,
+  timeoutMs: number,
+): Promise<boolean> {
   return new Promise((resolve) => {
     let done = false;
-    const socket = net.createConnection(socketPath);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const socket = net.createConnection(socketEndpoint);
     const finish = (delivered: boolean) => {
       if (done) return;
       done = true;
+      if (timeout) clearTimeout(timeout);
       socket.destroy();
       resolve(delivered);
     };
+
     socket.on("error", () => finish(false));
     socket.on("connect", () => socket.write(`${JSON.stringify(request)}\n`));
     socket.on("data", () => finish(true));
     socket.on("end", () => finish(false));
-    setTimeout(() => finish(false), 800).unref?.();
+    timeout = setTimeout(() => finish(false), timeoutMs);
+    timeout.unref?.();
   });
-}
-
-async function report(
-  socketPath: string,
-  paneId: string,
-  state: "working" | "idle",
-  message?: string,
-): Promise<boolean> {
-  // No agent_session_* fields on purpose: claiming the pane's session under a
-  // second source can trip herdr's session-owner conflict checks.
-  const params: Record<string, unknown> = {
-    pane_id: paneId,
-    source: SOURCE,
-    agent: "pi",
-    state,
-    seq: ++seq,
-  };
-  if (message) params.message = message;
-  const request = {
-    id: `${SOURCE}:${Date.now()}:${seq}`,
-    method: "pane.report_agent",
-    params,
-  };
-  return (await sendOnce(socketPath, request)) || sendOnce(socketPath, request);
-}
-
-async function releaseAuthority(
-  socketPath: string,
-  paneId: string,
-): Promise<void> {
-  await report(socketPath, paneId, "idle");
-  const request = {
-    id: `${SOURCE}:clear:${Date.now()}:${seq}`,
-    method: "pane.clear_agent_authority",
-    params: { pane_id: paneId, source: SOURCE, seq: ++seq },
-  };
-  await sendOnce(socketPath, request);
 }
 
 export default function (pi: ExtensionAPI) {
-  const socketPath = process.env.HERDR_SOCKET_PATH;
-  const paneId = process.env.HERDR_PANE_ID;
+  const socketPath = process.env.HERDR_SOCKET_PATH ?? "";
+  const paneId = process.env.HERDR_PANE_ID ?? "";
   if (process.env.HERDR_ENV !== "1" || !socketPath || !paneId) return;
 
-  let sessionPath: string | undefined;
-  let parentActive = false;
-  let reporting = false;
-  let lastSent = 0;
+  const socketEndpoint =
+    process.platform === "win32" ? `\\\\.\\pipe\\${socketPath}` : socketPath;
 
-  pi.on("session_start", (_event, ctx) => {
-    if ((ctx as { mode?: string } | undefined)?.mode !== "tui") return;
-    const manager = (ctx as { sessionManager?: SessionRef } | undefined)
-      ?.sessionManager;
+  async function sendRequest(request: HerdrRequest): Promise<void> {
+    if (await sendRequestAttempt(socketEndpoint, request, 500)) return;
+    await sendRequestAttempt(socketEndpoint, request, 1500);
+  }
+
+  let reportSeq = Date.now() * 1000;
+  let currentAgentSessionId: string | undefined;
+  let currentAgentSessionPath: string | undefined;
+  let sendInFlight = false;
+  let queuedState: QueuedState | undefined;
+
+  function nextReportSeq(): number {
+    reportSeq += 1;
+    return reportSeq;
+  }
+
+  function updateSessionRef(ctx: ExtensionContext): void {
     try {
-      const file = manager?.getSessionFile?.();
-      if (typeof file === "string") sessionPath = file;
+      const file = ctx.sessionManager.getSessionFile();
+      currentAgentSessionPath = file?.startsWith("/") ? file : undefined;
     } catch {
-      sessionPath = undefined;
+      currentAgentSessionPath = undefined;
     }
+
+    try {
+      currentAgentSessionId = ctx.sessionManager.getSessionId() || undefined;
+    } catch {
+      currentAgentSessionId = undefined;
+    }
+  }
+
+  function currentSessionRef(): SessionRefParams | undefined {
+    if (currentAgentSessionPath) {
+      return { agent_session_path: currentAgentSessionPath };
+    }
+    if (currentAgentSessionId) {
+      return { agent_session_id: currentAgentSessionId };
+    }
+    return undefined;
+  }
+
+  function reportSession(sessionStartSource?: string): Promise<void> {
+    const sessionRef = currentSessionRef();
+    if (!sessionRef) return Promise.resolve();
+
+    return sendRequest({
+      id: `${SOURCE}:session:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+      method: "pane.report_agent_session",
+      params: {
+        pane_id: paneId,
+        source: SOURCE,
+        agent: "pi",
+        seq: nextReportSeq(),
+        session_start_source: sessionStartSource,
+        ...sessionRef,
+      },
+    });
+  }
+
+  function sendState(
+    state: AgentState,
+    message?: string,
+    seq = nextReportSeq(),
+  ): Promise<void> {
+    return sendRequest({
+      id: `${SOURCE}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+      method: "pane.report_agent",
+      params: {
+        pane_id: paneId,
+        source: SOURCE,
+        agent: "pi",
+        state,
+        message,
+        seq,
+        ...currentSessionRef(),
+      },
+    });
+  }
+
+  function queueState(state: AgentState, message?: string): void {
+    queuedState = { state, message, seq: nextReportSeq() };
+    if (!sendInFlight) void drainStateQueue();
+  }
+
+  async function drainStateQueue(): Promise<void> {
+    if (sendInFlight) return;
+
+    sendInFlight = true;
+    try {
+      while (queuedState) {
+        const next = queuedState;
+        queuedState = undefined;
+        await sendState(next.state, next.message, next.seq);
+      }
+    } finally {
+      sendInFlight = false;
+      if (queuedState) void drainStateQueue();
+    }
+  }
+
+  let rootSession = false;
+  let agentActive = false;
+  let blockedCount = 0;
+  let blockedMessage: string | undefined;
+  let liveChildren = 0;
+  let lastState: AgentState | undefined;
+  let lastMessage: string | undefined;
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+  function childMessage(): string | undefined {
+    if (liveChildren === 1) return "서브에이전트 실행 중";
+    if (liveChildren > 1) return `서브에이전트 ${liveChildren}개 실행 중`;
+    return undefined;
+  }
+
+  function desiredState(): { state: AgentState; message?: string } {
+    if (blockedCount > 0) {
+      return { state: "blocked", message: blockedMessage };
+    }
+    if (agentActive) return { state: "working" };
+    if (liveChildren > 0) {
+      return { state: "working", message: childMessage() };
+    }
+    return { state: "idle" };
+  }
+
+  function publishState(force = false): void {
+    const next = desiredState();
+    if (!force && next.state === lastState && next.message === lastMessage) return;
+    lastState = next.state;
+    lastMessage = next.message;
+    queueState(next.state, next.message);
+  }
+
+  function refreshLiveChildren(): void {
+    const next = countLiveRuns(currentAgentSessionPath);
+    if (next === null || next === liveChildren) return;
+    liveChildren = next;
+    publishState();
+  }
+
+  function startPolling(): void {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(refreshLiveChildren, POLL_MS);
+    pollTimer.unref?.();
+  }
+
+  pi.events.on("herdr:blocked", (data) => {
+    if (!rootSession) return;
+    const blocked = data as { active?: boolean; label?: string };
+    if (blocked.active) {
+      blockedCount += 1;
+      blockedMessage = blocked.label;
+    } else {
+      blockedCount = Math.max(0, blockedCount - 1);
+      if (blockedCount === 0) blockedMessage = undefined;
+    }
+    publishState();
   });
 
-  pi.on("agent_start", () => {
-    parentActive = true;
+  pi.on("session_start", async (event, ctx) => {
+    if (ctx.mode !== "tui") return;
+
+    rootSession = true;
+    updateSessionRef(ctx);
+    liveChildren = countLiveRuns(currentAgentSessionPath) ?? 0;
+    await reportSession(event.reason === "reload" ? "resume" : event.reason);
+    agentActive = ctx.isIdle() === false;
+    startPolling();
+    publishState(true);
+  });
+
+  pi.on("agent_start", (_event, ctx) => {
+    if (!rootSession) return;
+    updateSessionRef(ctx);
+    void reportSession();
+    agentActive = true;
+    publishState();
   });
 
   pi.on("agent_settled", (_event, ctx) => {
-    const idle = (ctx as { isIdle?: () => boolean } | undefined)?.isIdle?.();
-    if (idle === true) parentActive = false;
+    if (!rootSession || ctx.isIdle() !== true) return;
+    const next = countLiveRuns(currentAgentSessionPath);
+    if (next !== null) liveChildren = next;
+    agentActive = false;
+    publishState();
   });
 
-  setInterval(async () => {
-    const live = countLiveRuns(sessionPath);
-    if (live === null) return;
-    const now = Date.now();
-    if (live > 0) {
-      if (!reporting || now - lastSent >= HEARTBEAT_MS) {
-        reporting = true;
-        lastSent = now;
-        await report(
-          socketPath!,
-          paneId!,
-          "working",
-          live === 1
-            ? "서브에이전트 실행 중"
-            : `서브에이전트 ${live}개 실행 중`,
-        );
-      }
-    } else if (reporting) {
-      reporting = false;
-      if (!parentActive) {
-        await releaseAuthority(socketPath!, paneId!);
-      }
-    }
-  }, POLL_MS).unref?.();
+  pi.on("session_shutdown", () => {
+    rootSession = false;
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = undefined;
+  });
 }

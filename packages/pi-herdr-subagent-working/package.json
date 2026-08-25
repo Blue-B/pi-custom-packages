@@ -1,7 +1,7 @@
 {
   "name": "pi-herdr-subagent-working",
-  "version": "0.1.0",
-  "description": "Keeps herdr's sidebar showing \"working\" while async subagent children launched by this pi session are still running.",
+  "version": "0.2.0",
+  "description": "Reports Pi and async subagent lifecycle through one Herdr state source.",
   "keywords": [
     "pi-package",
     "pi",
@@ -33,8 +33,11 @@
   "engines": {
     "node": ">=18"
   },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.70.0"
+    "@earendil-works/pi-coding-agent": ">=0.84.0"
   },
   "author": ""
 }
