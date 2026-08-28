@@ -2,7 +2,7 @@
 
 ![pi-custom-packages](./assets/banner.png)
 
-Ten small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Eleven small extensions for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -13,30 +13,9 @@ pi could almost do, and the fix turned out small enough to keep around. They liv
 together because they share conventions and get updated in the same afternoon,
 not because they form a system. Take the one you need.
 
-## Six that used to be here
-
-The repo is smaller than it was. Six packages have been deleted, and only one of
-those was because I stopped using it.
-
-Three went because pi grew the feature. `pi-normalize-images` resized tool-result
-images until pi started doing that in [#7330](https://github.com/earendil-works/pi/pull/7330),
-which came out of an issue I filed after finding 39 sessions on one machine
-between 10 MB and 288 MB, the worst of them 99 screenshots and 107 MB of base64
-([#5369](https://github.com/earendil-works/pi/issues/5369)).
-`pi-sanitize-tool-call-ids` rewrote tool-call IDs for Anthropic's
-`^[a-zA-Z0-9_-]+$` rule until `pi-ai` shipped `normalizeToolCallId()` with the
-same regex and the same 64-character cut. `pi-force-websearch-defaults` turned
-out to be two settings.
-
-The remaining three were mine to fix: one was a fork of someone else's work,
-one needed a subscription I dropped, and one only changed the startup logo.
-
-Everything below survived the same check: read pi's source for an equivalent,
-then turn the extension off and see whether anything actually breaks.
-
 ## Install
 
-All ten, straight from git:
+All eleven, straight from git:
 
 ```bash
 pi install git:github.com/Blue-B/pi-custom-packages
@@ -104,12 +83,13 @@ WSL interop and install nothing on the Linux side.
 |---|---|
 | [pi-gpt-img](./packages/pi-gpt-img) | A `gpt_img` tool for text-to-image and image-to-image on gpt-image-2, reusing the ChatGPT/Codex OAuth token pi already holds. |
 | [pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked) | [herdr](https://herdr.dev)'s sidebar shows a pane as working the entire time pi is actually waiting on an `ask_user_question` answer. This emits the blocked event herdr's own integration already listens for. |
+| [pi-codex-accounts](./packages/pi-codex-accounts) | Codex multi-account: auto-rotates on `429/quota` across `openai-codex` accounts, shows `5h/7d` bars with absolute reset dates (`8/28 05:07`) and current-account highlight. `/codex-accounts` widget hides on close. |
 
 ## Platform support
 
-Four of the ten need nothing beyond pi itself: bash-watchdog,
+Four of the eleven need nothing beyond pi itself: bash-watchdog,
 cap-context-images, cap-session-watchdog, and model-identity. The
-other six each want something specific.
+other seven each want something specific.
 
 | Needs | Packages |
 |---|---|
@@ -117,7 +97,7 @@ other six each want something specific.
 | ffmpeg on `PATH` | winshot, gpt-img |
 | [pi-subagents](https://www.npmjs.com/package/pi-subagents), for its `reviewer` agent | verify-gate |
 | [herdr](https://herdr.dev) with `herdr integration install pi` | herdr-ask-blocked |
-| A ChatGPT or Codex OAuth login | gpt-img |
+| A ChatGPT or Codex OAuth login | gpt-img, codex-accounts |
 
 On a native Linux machine the three Windows packages load without error and then
 do nothing, which is the intended behaviour rather than a guard worth writing.

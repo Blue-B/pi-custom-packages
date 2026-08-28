@@ -1,0 +1,41 @@
+{
+  "name": "pi-codex-accounts",
+  "version": "0.1.0",
+  "description": "Multi-account manager for ChatGPT Codex in pi: auto-rotates on 429/quota, shows 5h/7d bars with absolute reset dates, token usage per 5h window, and current-account highlighting.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "extension",
+    "codex",
+    "openai-codex",
+    "chatgpt",
+    "multi-account",
+    "quota",
+    "rate-limit"
+  ],
+  "license": "MIT",
+  "author": "Blue-B",
+  "type": "module",
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-codex-accounts"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  }
+}
