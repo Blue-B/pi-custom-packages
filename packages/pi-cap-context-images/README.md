@@ -41,6 +41,32 @@ Then run `/reload` in pi.
 that already bloated on disk, which this extension deliberately does not touch.
 One works on the payload leaving pi, the other on the file already written.
 
+## Bundled script: `patch-image-resize-limit.mjs`
+
+This extension prunes images that are *already* in the context. The bundled
+script attacks the same problem one step earlier, at ingest.
+
+pi's `image-resize-core.js` ships `DEFAULT_MAX_BYTES = 4.5MB`, sized against
+Anthropic's 5 MB **per-image** limit. The limit that bites first in practice is
+the 32 MB **per-request** one: a handful of full-page screenshots at 4.5 MB each
+cross it, and the session is then unsendable *and* uncompactable, because image
+bytes barely register as tokens so the compactor reports "session too small".
+
+```bash
+node ./packages/pi-cap-context-images/scripts/patch-image-resize-limit.mjs
+node ./packages/pi-cap-context-images/scripts/patch-image-resize-limit.mjs --check
+```
+
+It rewrites the two defaults to 2 MB and JPEG quality 88, and makes both
+tunable at runtime through `PI_IMAGE_MAX_MB` and `PI_IMAGE_JPEG_QUALITY`. The
+target resolves from `process.execPath`, or pass the file explicitly, or set
+`PI_CORE_ROOT`. The original is kept next to it as `.bak-image-limit`.
+
+This edits installed `node_modules`, so a `pi update` reverts it. Re-run the
+script afterwards; it is idempotent and a no-op once patched. Note the script
+only affects images arriving from now on, it does not shrink a session that
+already swallowed oversized ones.
+
 ## Requirements
 
 - [pi coding agent](https://github.com/earendil-works/pi), tested on 0.84
