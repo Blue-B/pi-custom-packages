@@ -1,7 +1,7 @@
 {
   "name": "pi-custom-packages",
   "version": "0.1.0",
-  "description": "Eleven extensions for the pi coding agent: session guards, image context control, Windows/WSL screen capture, cursor, and Codex multi-account rotation.",
+  "description": "Thirteen packages for the pi coding agent: session guards, context control, Herdr and remote-pi integration, Windows/WSL tools, and Codex account rotation.",
   "type": "module",
   "license": "MIT",
   "keywords": [
