@@ -83,6 +83,7 @@ WSL interop and install nothing on the Linux side.
 |---|---|
 | [pi-gpt-img](./packages/pi-gpt-img) | A `gpt_img` tool for text-to-image and image-to-image on gpt-image-2, reusing the ChatGPT/Codex OAuth token pi already holds. |
 | [pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked) | [herdr](https://herdr.dev)'s sidebar shows a pane as working the entire time pi is actually waiting on an `ask_user_question` answer. This emits the blocked event herdr's own integration already listens for. |
+| [pi-remote-pi-space-name](./packages/pi-remote-pi-space-name) | A dozen [herdr](https://herdr.dev) Spaces share one directory, so [remote-pi](https://remote-pi.jacobmoura.work)'s phone tiles all read `shell`, `shell#2`, `shell#3`. Titles each tile with its Space label instead, keeps two Spaces named `~` both called `~`, and renames the tile in place when the Space is renamed. Ships a patch script. |
 | [pi-codex-accounts](./packages/pi-codex-accounts) | Codex multi-account: auto-rotates on `429/quota` across `openai-codex` accounts, shows `5h/7d` bars with absolute reset dates (`8/28 05:07`) and current-account highlight. `/codex-accounts` widget hides on close. |
 
 ## Platform support
@@ -97,6 +98,7 @@ other seven each want something specific.
 | ffmpeg on `PATH` | winshot, gpt-img |
 | [pi-subagents](https://www.npmjs.com/package/pi-subagents), for its `reviewer` agent | verify-gate |
 | [herdr](https://herdr.dev) with `herdr integration install pi` | herdr-ask-blocked |
+| [herdr](https://herdr.dev) and [remote-pi](https://www.npmjs.com/package/remote-pi) | remote-pi-space-name |
 | A ChatGPT or Codex OAuth login | gpt-img, codex-accounts |
 
 On a native Linux machine the three Windows packages load without error and then

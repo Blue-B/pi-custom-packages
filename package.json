@@ -33,6 +33,7 @@
       "./packages/pi-herdr-ask-blocked/extensions/herdr-ask-blocked/index.ts",
       "./packages/pi-model-identity/extensions/model-identity/index.ts",
       "./packages/pi-recordly/extensions/recordly/index.ts",
+      "./packages/pi-remote-pi-space-name/extensions/remote-pi-space-name/index.ts",
       "./packages/pi-verify-gate/extensions/verify-gate/index.ts",
       "./packages/pi-winshot/extensions/winshot/index.ts"
     ],

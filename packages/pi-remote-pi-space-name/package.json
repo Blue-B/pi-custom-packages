@@ -1,0 +1,40 @@
+{
+  "name": "pi-remote-pi-space-name",
+  "version": "0.1.0",
+  "description": "Titles each remote-pi mobile tile with its herdr Space label, keeps duplicate labels unsuffixed, and renames the tile in place when the Space is renamed.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "extension",
+    "herdr",
+    "remote-pi",
+    "workspace",
+    "naming"
+  ],
+  "license": "MIT",
+  "author": "Blue-B",
+  "type": "module",
+  "files": [
+    "extensions",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-remote-pi-space-name"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  }
+}
