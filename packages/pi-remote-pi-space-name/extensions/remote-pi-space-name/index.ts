@@ -1,12 +1,11 @@
-// Gives each herdr Space its own remote-pi mesh identity.
+// Gives each herdr pane its own remote-pi mesh identity.
 //
-// Every Space in a herdr session shares one working directory, so they also
-// share `<cwd>/.pi/remote-pi/config.json` and its single `agent_name`. The
-// broker keys agents by (cwd, name), so twelve Spaces in ~ register as one
-// name plus eleven `#N` variants, meaningless as a mesh address.
+// Every pane in a herdr session can share one working directory, and therefore
+// `<cwd>/.pi/remote-pi/config.json`. The broker keys agents by (cwd, name), so
+// the Space label alone collides for panes in the same Space.
 //
-// herdr hands each pane a HERDR_WORKSPACE_ID, so the Space label is knowable
-// here. This injects it as `agent_name` through REMOTE_PI_DIRECT_CONFIG,
+// Herdr hands each pane a HERDR_WORKSPACE_ID and HERDR_PANE_ID. This injects a
+// `Space · pN` identity through REMOTE_PI_DIRECT_CONFIG,
 // remote-pi's documented escape hatch for supplying the whole local config as
 // inline JSON (it takes precedence over the file). remote-pi itself is not
 // modified by this file.
@@ -69,11 +68,17 @@ function existingConfig(cwd: string): Record<string, unknown> {
 
 const workspaceId =
 	process.env.HERDR_ENV === "1" ? process.env.HERDR_WORKSPACE_ID?.trim() : undefined;
+const paneId =
+	process.env.HERDR_ENV === "1" ? process.env.HERDR_PANE_ID?.trim() : undefined;
 
-if (workspaceId && !process.env.REMOTE_PI_DIRECT_CONFIG) {
+function paneSuffix(id: string): string {
+	return id.slice(id.lastIndexOf(":") + 1);
+}
+
+if (workspaceId && paneId && !process.env.REMOTE_PI_DIRECT_CONFIG) {
 	try {
 		const label = readLabel(workspaceId);
-		const agentName = label ? toAgentName(label) : "";
+		const agentName = label ? toAgentName(`${label}-${workspaceId}-${paneSuffix(paneId)}`) : "";
 		// `broadcast` and `broker` are reserved mesh addresses.
 		if (agentName && agentName !== "broadcast" && agentName !== "broker") {
 			process.env.REMOTE_PI_DIRECT_CONFIG = JSON.stringify({

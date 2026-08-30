@@ -1,7 +1,7 @@
 {
   "name": "pi-remote-pi-space-name",
-  "version": "0.1.0",
-  "description": "Titles each remote-pi mobile tile with its herdr Space label, keeps duplicate labels unsuffixed, and renames the tile in place when the Space is renamed.",
+  "version": "0.1.1",
+  "description": "Names remote-pi tiles after their Herdr pane and updates them immediately through Herdr socket events.",
   "keywords": [
     "pi-package",
     "pi",
@@ -16,6 +16,9 @@
   "license": "MIT",
   "author": "Blue-B",
   "type": "module",
+  "scripts": {
+    "test": "node --test scripts/herdr-space.test.mjs"
+  },
   "files": [
     "extensions",
     "scripts",
