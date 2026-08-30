@@ -8,7 +8,7 @@ Codex는 계정당 `5시간`과 `7일` 윈도우로 할당량을 잰다. pi는 �
 
 - **자동 순환**: `429 / rate limit / quota` 에러에서 `ChatGPT-Account-Id` 기준 `resetAt`까지 쿨다운을 걸고 다음 계정으로 `pi.setModel()` + `followUp` 재시도
 - **한도 시각화**: `/codex-accounts`에서 `https://chatgpt.com/backend-api/wham/usage`를 직접 조회해 `5시간 ███░░ [32% 남음] 리셋 8/28 05:07 (4시간 42분 후) · 7일 █████░░ [49% 남음] 리셋 9/02 20:26 (5일 20시간 후)` 형태로 표시. 절대 날짜 + 남은 시간 함께
-- **현재 계정**: 헤더 `│ 현재: gongryak@naver.com (1번) ●`와 각 줄 `●/○` + `← 현재 사용 중`으로 구분. 목록 진입 전 위젯으로 표를 띄우고 닫으면 자동으로 사라짐 (`setWidget`, `notify` 아님)
+- **현재 계정**: 헤더 `│ 현재: go***@naver.com (1번) ●`와 각 줄 `●/○` + `← 현재 사용 중`으로 구분. 목록 진입 전 위젯으로 표를 띄우고 닫으면 자동으로 사라짐 (`setWidget`, `notify` 아님)
 - **토큰 카운트**: `~/.pi/agent/codex-account-usage.json`에 계정별 `total / cacheRead`를 5시간 윈도우 기준으로만 누적·리셋. 웹에서 쓴 건 `rate_limit`에는 잡히지만 이 숫자는 pi가 API로 쓴 것만 센다
 
 ## Screen
