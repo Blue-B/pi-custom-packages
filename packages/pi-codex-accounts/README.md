@@ -11,6 +11,10 @@ Codex는 계정당 `5시간`과 `7일` 윈도우로 할당량을 잰다. pi는 �
 - **현재 계정**: 헤더 `│ 현재: gongryak@naver.com (1번) ●`와 각 줄 `●/○` + `← 현재 사용 중`으로 구분. 목록 진입 전 위젯으로 표를 띄우고 닫으면 자동으로 사라짐 (`setWidget`, `notify` 아님)
 - **토큰 카운트**: `~/.pi/agent/codex-account-usage.json`에 계정별 `total / cacheRead`를 5시간 윈도우 기준으로만 누적·리셋. 웹에서 쓴 건 `rate_limit`에는 잡히지만 이 숫자는 pi가 API로 쓴 것만 센다
 
+## Screen
+
+![`/codex-accounts` 실행 화면, 이메일 마스킹](./assets/codex-accounts.png)
+
 ## Install
 
 ```bash

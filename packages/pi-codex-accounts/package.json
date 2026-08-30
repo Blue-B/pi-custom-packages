@@ -19,6 +19,7 @@
   "author": "Blue-B",
   "type": "module",
   "files": [
+    "assets",
     "extensions",
     "README.md",
     "LICENSE"
