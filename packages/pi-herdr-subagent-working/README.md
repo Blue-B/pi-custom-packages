@@ -22,6 +22,14 @@ A child counts as live only when:
 
 The resulting priority is `blocked`, parent working, async child working, then idle. All reports use the same source and sequence clock.
 
+## Real-world recovery
+
+On August 31, 2026, the host lost external power and Windows and WSL stopped without a clean shutdown. After reboot, Herdr restored 13 existing workspaces and started all 13 Pi sessions from their saved session paths. Work resumed without manually rebuilding the workspace layout or locating previous conversations.
+
+Herdr performs the actual workspace and agent restoration. This package preserves the official reporter's session identity behavior while adding async child tracking, so replacing the official reporter does not give up Herdr's recovery path.
+
+This was the first recovery test under a real power failure. It is not a substitute for a UPS, which still protects hardware and filesystem integrity, but it prevented the outage from interrupting the working context.
+
 ## Install
 
 ```bash
