@@ -16,7 +16,7 @@ the tile and room are pane-specific. A Space rename updates every live pane in t
 ## What changes
 
 | What | Before | After |
-|---|---|---|
+| --- | --- | --- |
 | Tile name | `shell`, `shell#2`, `shell#3` | `Space · wN:pN` |
 | Two panes in one Space | one shared room | separate rooms and tiles |
 | Same-named Spaces | indistinguishable suffixes | distinct IDs, e.g. `~ · w7Y:p1` |
@@ -41,9 +41,9 @@ config escape hatch. The rest of the on-disk config is preserved, including
 
 - the announced room name comes from the Herdr Space label plus pane ID
 - the room id is derived from `HERDR_PANE_ID`, so sibling panes never collide
-- one per-pane Herdr socket subscription updates Space renames and stops
-  remote-pi when that pane or Space closes, without polling or recurring child
-  processes
+- one per-pane Herdr socket subscription pushes Space renames as room metadata
+  without reconnecting or re-pairing, and stops remote-pi when that pane or
+  Space closes, without polling or recurring child processes
 
 The patch is idempotent and only rewrites five anchors in `index.js` plus one in
 `rooms.js`. If a remote-pi release moves any of them it refuses to apply rather

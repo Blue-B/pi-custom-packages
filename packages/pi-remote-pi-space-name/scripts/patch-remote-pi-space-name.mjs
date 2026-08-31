@@ -19,7 +19,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MARKER = "__herdrSpace";
-const PATCH_VERSION = "__herdrSpace:event-v1";
+const EVENT_V1 = "__herdrSpace:event-v1";
+const PATCH_VERSION = "__herdrSpace:event-v2";
 const RUNTIME = "herdr-space.js";
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -53,6 +54,32 @@ const rooms = readFileSync(ROOMS, "utf8");
 
 const HANDLERS = `import * as ${MARKER} from "./${RUNTIME}";
 // ${PATCH_VERSION}
+// A Space rename is room metadata, not a new mesh identity or connection.
+function __herdrRelabel() {
+    const label = ${MARKER}.displayName();
+    if (!label)
+        return;
+    if (_myRoomMeta)
+        _myRoomMeta = { ..._myRoomMeta, name: label, display_name: label };
+    try {
+        _relay?.sendControl({
+            type: "room_meta_update",
+            room_id: _myRoomId,
+            meta: { name: label, display_name: label },
+        });
+    }
+    catch { /* best-effort while relay is reconnecting */ }
+    try {
+        _refreshFooter();
+    }
+    catch { /* no TUI attached */ }
+}
+function __herdrPaneClosed() {
+    _goIdle("herdr_pane_closed");
+}`;
+
+const EVENT_V1_HANDLERS = `import * as ${MARKER} from "./${RUNTIME}";
+// ${EVENT_V1}
 // Herdr events rename both the mesh identity and the existing pane room.
 async function __herdrRelabel() {
     const label = ${MARKER}.displayName();
@@ -127,15 +154,17 @@ if (index.includes(MARKER) && rooms.includes(MARKER)) {
 		console.log(`outdated patch: ${DIST}`);
 		process.exit(1);
 	}
-	const upgraded = applyAll(
-		index,
-		[
-			[LEGACY_HANDLERS, HANDLERS],
-			[`${MARKER}.startPolling(__herdrRelabel, __herdrPaneClosed);`, `${MARKER}.startWatching(__herdrRelabel, __herdrPaneClosed);`],
-			[`${MARKER}.stopPolling();`, `${MARKER}.stopWatching();`],
-		],
-		"index.js",
-	);
+	const upgraded = index.includes(EVENT_V1)
+		? applyAll(index, [[EVENT_V1_HANDLERS, HANDLERS]], "index.js")
+		: applyAll(
+				index,
+				[
+					[LEGACY_HANDLERS, HANDLERS],
+					[`${MARKER}.startPolling(__herdrRelabel, __herdrPaneClosed);`, `${MARKER}.startWatching(__herdrRelabel, __herdrPaneClosed);`],
+					[`${MARKER}.stopPolling();`, `${MARKER}.stopWatching();`],
+				],
+				"index.js",
+			);
 	cpSync(join(HERE, RUNTIME), join(DIST, RUNTIME));
 	writeFileSync(INDEX, upgraded);
 	console.log(`upgraded patch: ${DIST}`);

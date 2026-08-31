@@ -11,6 +11,18 @@ const waitFor = (promise, ms = 2_000) =>
 		new Promise((_, reject) => setTimeout(() => reject(new Error("timed out")), ms)),
 	]);
 
+test("publishes renames as metadata without reconnecting", async () => {
+	const source = await readFile(new URL("./patch-remote-pi-space-name.mjs", import.meta.url), "utf8");
+	const handler = source.slice(
+		source.indexOf("const HANDLERS ="),
+		source.indexOf("const EVENT_V1_HANDLERS ="),
+	);
+	assert.match(handler, /type: \"room_meta_update\"/);
+	assert.match(handler, /room_id: _myRoomId/);
+	assert.doesNotMatch(handler, /_meshNode\.rename/);
+	assert.doesNotMatch(handler, /_relay\?\.close/);
+});
+
 test("uses Herdr socket events without polling", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "herdr-space-"));
 	const socketPath = join(dir, "herdr.sock");
