@@ -7,6 +7,11 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import {
+	exhaustedResetAt,
+	isAccountAvailable,
+	type Window,
+} from "./quota.ts";
 
 type Credential = {
 	type?: string;
@@ -15,14 +20,13 @@ type Credential = {
 	expires?: number;
 	accountId?: string;
 };
-type Window = {
-	used_percent?: number;
-	reset_at?: number;
-	limit_window_seconds?: number;
-};
 type UsageBody = {
 	plan_type?: string;
-	rate_limit?: { primary_window?: Window; secondary_window?: Window };
+	rate_limit?: {
+		allowed?: boolean;
+		primary_window?: Window;
+		secondary_window?: Window;
+	};
 };
 type Account = Awaited<ReturnType<typeof fetchAccount>>;
 type TokenUsage = {
@@ -260,6 +264,7 @@ async function fetchAccount(provider: string, credential: Credential) {
 			provider,
 			email,
 			plan: body.plan_type,
+			allowed: body.rate_limit?.allowed,
 			primary: body.rate_limit?.primary_window,
 			secondary: body.rate_limit?.secondary_window,
 		};
@@ -491,14 +496,25 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			Object.fromEntries(entries)[current] ?? {},
 		);
 		const reset =
-			"primary" in currentUsage ? resetAt(currentUsage.primary) : undefined;
+			"primary" in currentUsage
+				? exhaustedResetAt(currentUsage.primary, currentUsage.secondary)
+				: undefined;
 		cooldowns.set(
 			current,
 			reset && reset > Date.now() ? reset : Date.now() + 60 * 60 * 1000,
 		);
-		const next = entries.find(
-			([provider]) =>
-				provider !== current && (cooldowns.get(provider) ?? 0) <= Date.now(),
+		const candidates = await Promise.all(
+			entries.map(async ([provider, credential]) => ({
+				provider,
+				credential,
+				usage: await fetchAccount(provider, credential),
+			})),
+		);
+		const next = candidates.find(
+			({ provider, usage }) =>
+				provider !== current &&
+				(cooldowns.get(provider) ?? 0) <= Date.now() &&
+				isAccountAvailable(usage),
 		);
 		if (!next) {
 			ctx.ui.notify(
@@ -507,19 +523,25 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			);
 			return;
 		}
-		if (!(await switchTo(next[0], ctx, pi))) return;
+		if (!(await switchTo(next.provider, ctx, pi))) return;
 		const hadOutput = event.message.content.some(
 			(part) => part.type === "text" && part.text.trim().length > 0,
 		);
 		ctx.ui.notify(
-			`${emailFromToken(next[1].access)} 계정으로 자동 전환했습니다.`,
+			`${emailFromToken(next.credential.access)} 계정으로 자동 전환했습니다.`,
 			"warning",
 		);
 		if (!hadOutput) {
-			pi.sendUserMessage(
-				"이전 계정의 한도가 소진되어 계정을 전환했습니다. 중단된 작업을 그대로 계속하세요.",
+			pi.sendMessage(
+				{
+					customType: "codex-account-switch",
+					content:
+						"[자동 계정 전환] 직전 응답이 한도 오류로 출력 없이 실패했습니다. 바로 앞의 실제 사용자 요청에만 다시 응답하세요. 다른 세션이나 태스크를 조회하지 마세요.",
+					display: false,
+				},
 				{
 					deliverAs: "followUp",
+					triggerTurn: true,
 				},
 			);
 		}
