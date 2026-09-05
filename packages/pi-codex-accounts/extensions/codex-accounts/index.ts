@@ -1,13 +1,13 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { getModels } from "@earendil-works/pi-ai/compat";
 import {
 	ModelRuntime,
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { withFileLock } from "./lock.ts";
+import { modelForAccount } from "./model.ts";
 import {
 	exhaustedResetAt,
 	isAccountAvailable,
@@ -58,50 +58,56 @@ type LegacyOAuthCallbacks = {
 	signal?: AbortSignal;
 };
 
-async function createCodexOAuth() {
+async function createCodexConfig() {
 	const runtime = await ModelRuntime.create();
 	const modern = runtime.getProvider("openai-codex")?.auth.oauth;
 	if (!modern) throw new Error("OpenAI Codex OAuth provider unavailable");
 	return {
-		name: modern.name,
-		async login(callbacks: LegacyOAuthCallbacks) {
-			return modern.login({
-				signal: callbacks.signal,
-				async prompt(prompt) {
-					if (prompt.type === "select") {
-						const selected = await callbacks.onSelect({
+		oauth: {
+			name: modern.name,
+			async login(callbacks: LegacyOAuthCallbacks) {
+				return modern.login({
+					signal: callbacks.signal ?? new AbortController().signal,
+					async prompt(prompt) {
+						if (prompt.type === "select") {
+							const selected = await callbacks.onSelect({
+								message: prompt.message,
+								options: prompt.options.map(({ id, label }) => ({ id, label })),
+							});
+							if (!selected) throw new Error("Login cancelled");
+							return selected;
+						}
+						if (prompt.type === "manual_code" && callbacks.onManualCodeInput)
+							return callbacks.onManualCodeInput();
+						return callbacks.onPrompt({
 							message: prompt.message,
-							options: prompt.options.map(({ id, label }) => ({ id, label })),
+							placeholder: prompt.placeholder,
 						});
-						if (!selected) throw new Error("Login cancelled");
-						return selected;
-					}
-					if (prompt.type === "manual_code" && callbacks.onManualCodeInput)
-						return callbacks.onManualCodeInput();
-					return callbacks.onPrompt({
-						message: prompt.message,
-						placeholder: prompt.placeholder,
-					});
-				},
-				notify(event) {
-					if (event.type === "auth_url") callbacks.onAuth(event);
-					else if (event.type === "device_code") callbacks.onDeviceCode(event);
-					else callbacks.onProgress?.(event.message);
-				},
-			});
+					},
+					notify(event) {
+						if (event.type === "auth_url") callbacks.onAuth(event);
+						else if (event.type === "device_code") callbacks.onDeviceCode(event);
+						else callbacks.onProgress?.(event.message);
+					},
+				});
+			},
+			async refreshToken(credentials: Credential, signal?: AbortSignal) {
+				return modern.refresh(
+					{
+						...credentials,
+						type: "oauth",
+						access: credentials.access ?? "",
+						refresh: credentials.refresh ?? "",
+						expires: credentials.expires ?? 0,
+					},
+					signal ?? new AbortController().signal,
+				);
+			},
+			getApiKey(credentials: Credential) {
+				return credentials.access ?? "";
+			},
 		},
-		async refreshToken(credentials: Credential) {
-			return modern.refresh({
-				...credentials,
-				type: "oauth",
-				access: credentials.access ?? "",
-				refresh: credentials.refresh ?? "",
-				expires: credentials.expires ?? 0,
-			});
-		},
-		getApiKey(credentials: Credential) {
-			return credentials.access ?? "";
-		},
+		models: runtime.getModels("openai-codex").map(aliasModel),
 	};
 }
 
@@ -337,7 +343,7 @@ function buildTable(accounts: Account[], tokenUsage: TokenUsageState, current?: 
 	return [header + curLine, "─".repeat(72), ...lines].join("\n");
 }
 
-function aliasModel(model: ReturnType<typeof getModels>[number]) {
+function aliasModel(model: ReturnType<ModelRuntime["getModels"]>[number]) {
 	return {
 		id: model.id,
 		name: model.name,
@@ -359,11 +365,14 @@ async function switchTo(
 ): Promise<boolean> {
 	if (ctx.model?.provider === provider) return true;
 	const preferredId = ctx.model?.id;
-	const target =
-		(preferredId ? ctx.modelRegistry.find(provider, preferredId) : undefined) ??
+	const target = modelForAccount(
+		provider,
+		ctx.model,
+		preferredId ? ctx.modelRegistry.find(provider, preferredId) : undefined,
 		ctx.modelRegistry
 			.getAvailable()
-			.find((model) => model.provider === provider);
+			.find((model) => model.provider === provider),
+	);
 	if (!target) {
 		ctx.ui.notify(
 			`${provider}에서 사용할 모델을 찾지 못했습니다. /reload 후 다시 시도하세요.`,
@@ -375,7 +384,7 @@ async function switchTo(
 }
 
 export default async function codexAccounts(pi: ExtensionAPI) {
-	const codexOAuth = await createCodexOAuth();
+	const { oauth: codexOAuth, models } = await createCodexConfig();
 	const accounts = await readAccounts().catch(() => []);
 	const highest = Math.max(
 		1,
@@ -383,7 +392,6 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 	);
 	const providers = new Set(accounts.map(([provider]) => provider));
 	providers.add(`openai-codex-account-${highest + 1}`);
-	const models = getModels("openai-codex").map(aliasModel);
 
 	for (const provider of providers) {
 		if (provider === "openai-codex") continue;
