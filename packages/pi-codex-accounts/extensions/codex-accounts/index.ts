@@ -7,6 +7,7 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { withFileLock } from "./lock.ts";
 import {
 	exhaustedResetAt,
 	isAccountAvailable,
@@ -467,22 +468,28 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			event.message.usage.totalTokens > 0
 		) {
 			const message = event.message;
-			usageWrite = usageWrite.then(async () => {
-				const state = await readTokenUsage();
-				let usage = state[message.provider] ?? emptyTokenUsage();
-				if (usage.resetAt && message.timestamp >= usage.resetAt)
-					usage = emptyTokenUsage();
-				const fingerprint = `${message.provider}:${message.timestamp}:${message.model}:${message.usage.totalTokens}`;
-				if (usage.seen.includes(fingerprint)) return;
-				usage.input += message.usage.input;
-				usage.output += message.usage.output;
-				usage.cacheRead += message.usage.cacheRead;
-				usage.cacheWrite += message.usage.cacheWrite;
-				usage.total += message.usage.totalTokens;
-				usage.seen = [...usage.seen.slice(-999), fingerprint];
-				state[message.provider] = usage;
-				await writeTokenUsage(state);
-			});
+			// 여러 pi 프로세스가 같은 파일을 갱신하므로 read→write 전체를 프로세스 간 잠금으로 감싼다.
+			// 한 번 실패해도 체인이 영구 거부 상태로 남지 않게 catch로 마무리한다.
+			usageWrite = usageWrite
+				.then(() =>
+					withFileLock(tokenUsagePath, async () => {
+						const state = await readTokenUsage();
+						let usage = state[message.provider] ?? emptyTokenUsage();
+						if (usage.resetAt && message.timestamp >= usage.resetAt)
+							usage = emptyTokenUsage();
+						const fingerprint = `${message.provider}:${message.timestamp}:${message.model}:${message.usage.totalTokens}`;
+						if (usage.seen.includes(fingerprint)) return;
+						usage.input += message.usage.input;
+						usage.output += message.usage.output;
+						usage.cacheRead += message.usage.cacheRead;
+						usage.cacheWrite += message.usage.cacheWrite;
+						usage.total += message.usage.totalTokens;
+						usage.seen = [...usage.seen.slice(-999), fingerprint];
+						state[message.provider] = usage;
+						await writeTokenUsage(state);
+					}),
+				)
+				.catch(() => {});
 			await usageWrite;
 		}
 		if (event.message.stopReason !== "error") return;
@@ -524,26 +531,11 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			return;
 		}
 		if (!(await switchTo(next.provider, ctx, pi))) return;
-		const hadOutput = event.message.content.some(
-			(part) => part.type === "text" && part.text.trim().length > 0,
-		);
+		// 자동 재개는 하지 않는다. 한도 오류를 받은 모든 세션이 동시에 다음 턴을 돌리면서
+		// 새 계정 한도까지 연쇄 소진된 사고(2026-09-05)의 직접 원인이었다.
 		ctx.ui.notify(
-			`${emailFromToken(next.credential.access)} 계정으로 자동 전환했습니다.`,
+			`${emailFromToken(next.credential.access)} 계정으로 전환했습니다. 이어가려면 직전 요청을 다시 보내세요.`,
 			"warning",
 		);
-		if (!hadOutput) {
-			pi.sendMessage(
-				{
-					customType: "codex-account-switch",
-					content:
-						"[자동 계정 전환] 직전 응답이 한도 오류로 출력 없이 실패했습니다. 바로 앞의 실제 사용자 요청에만 다시 응답하세요. 다른 세션이나 태스크를 조회하지 마세요.",
-					display: false,
-				},
-				{
-					deliverAs: "followUp",
-					triggerTurn: true,
-				},
-			);
-		}
 	});
 }
