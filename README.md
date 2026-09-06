@@ -2,7 +2,7 @@
 
 ![pi-custom-packages](./assets/banner.png)
 
-Thirteen small packages for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Ten small packages for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -15,7 +15,7 @@ not because they form a system. Take the one you need.
 
 ## Install
 
-Twelve of the thirteen, straight from git:
+Nine of the ten, straight from git:
 
 ```bash
 pi install git:github.com/Blue-B/pi-custom-packages
@@ -53,7 +53,7 @@ confidently naming the wrong model, a conclusion nobody checked. These three
 watch for that.
 
 | Package | What it does |
-|---|---|
+| --- | --- |
 | [pi-verify-gate](./packages/pi-verify-gate) | `/verify` (alias `/검증`) pulls the raw tool calls and results of the agent's last turn straight out of the session log, writes them to a file, and has a fresh-context `reviewer` subagent grade the conclusion against them. The agent never picks the target or supplies the evidence. Needs [pi-subagents](https://www.npmjs.com/package/pi-subagents). |
 | [pi-bash-watchdog](./packages/pi-bash-watchdog) | pi's bash timeout is in seconds, and models keep passing milliseconds. Rewrites `120000` to `120`, caps foreground dev servers, fills a default when the field is missing. Adds `/bash-watchdog-status`. |
 | [pi-model-identity](./packages/pi-model-identity) | A model cannot introspect its own weights, so it repeats whatever name is in the prompt. Injects the live model ID on the first turn, on a model switch, and after compaction. Ships `model_identity_status`. |
@@ -61,31 +61,26 @@ watch for that.
 ### Context hygiene
 
 pi resends the whole conversation every turn, images included. Twenty screenshots
-means twenty base64 blobs on turn twenty-one. One of these works on the outbound
-payload, the other on the file already written to disk.
+means twenty base64 blobs on turn twenty-one. This package limits the outbound
+payload without modifying session files on disk.
 
 | Package | What it does |
-|---|---|
+| --- | --- |
 | [pi-cap-context-images](./packages/pi-cap-context-images) | Keeps the newest image in the outbound payload and turns the older ones into short text placeholders. pi's `images.autoResize` shrinks images on the way in; nothing in pi prunes what is already sitting in the context. |
-| [pi-cap-session-watchdog](./packages/pi-cap-session-watchdog) | The on-disk half: finds session JSONL files that already grew too large while idle, caps their stale images, trims live context. Debounced across processes, prunes its own backups. |
 
 ### Windows desktop
 
-pi runs in WSL and cannot see the desktop it is running under. These three give it
-eyes, hands, and a recorder, and they are meant to be used together: capture the
-screen, act on it, record the result. All three go through `powershell.exe` over
-WSL interop and install nothing on the Linux side.
+pi runs in WSL and cannot see the Windows desktop directly. `pi-winshot` captures
+it through `powershell.exe` over WSL interop, with no Linux-side installation.
 
 | Package | What it does |
-|---|---|
+| --- | --- |
 | [pi-winshot](./packages/pi-winshot) | Capture a screen, a region, a monitor, or one window even when five terminals sit on top of it. Then crop, resize, and mask the parts that should not reach the model. |
-| [pi-cursor](./packages/pi-cursor) | Focus a window, move the cursor with easing that looks human on a recording, click, type. Plain PowerShell, no AutoHotkey. |
-| [pi-recordly](./packages/pi-recordly) | Start and stop [Recordly](https://recordly.dev) recordings, target one window, read status. |
 
 ### Everything else
 
 | Package | What it does |
-|---|---|
+| --- | --- |
 | [pi-gpt-img](./packages/pi-gpt-img) | A `gpt_img` tool for text-to-image and image-to-image on gpt-image-2, reusing the ChatGPT/Codex OAuth token pi already holds. |
 | [pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked) | [herdr](https://herdr.dev)'s sidebar shows a pane as working the entire time pi is actually waiting on an `ask_user_question` answer. This emits the blocked event herdr's own integration already listens for. |
 | [pi-herdr-subagent-working](./packages/pi-herdr-subagent-working) | Keeps a herdr pane working while async `pi-subagents` children are still running. Replaces herdr's managed Pi reporter, so it is installed separately rather than through the root bundle. |
@@ -94,13 +89,12 @@ WSL interop and install nothing on the Linux side.
 
 ## Platform support
 
-Four of the thirteen need nothing beyond pi itself: bash-watchdog,
-cap-context-images, cap-session-watchdog, and model-identity. The
-other nine each want something specific.
+Three of the ten need nothing beyond pi itself: bash-watchdog,
+cap-context-images, and model-identity. The other seven each want something specific.
 
 | Needs | Packages |
-|---|---|
-| Windows 10/11 with WSL2 and interop | winshot, cursor, recordly |
+| --- | --- |
+| Windows 10/11 with WSL2 and interop | winshot |
 | ffmpeg on `PATH` | winshot, gpt-img |
 | [pi-subagents](https://www.npmjs.com/package/pi-subagents), for its `reviewer` agent | verify-gate |
 | [herdr](https://herdr.dev) with `herdr integration install pi` | herdr-ask-blocked |
@@ -108,8 +102,8 @@ other nine each want something specific.
 | [herdr](https://herdr.dev) and [remote-pi](https://www.npmjs.com/package/remote-pi) | remote-pi-space-name |
 | A ChatGPT or Codex OAuth login | gpt-img, codex-accounts |
 
-On a native Linux machine the three Windows packages load without error and then
-do nothing, which is the intended behaviour rather than a guard worth writing.
+Windows screen capture requires WSL interop; native Linux has no Windows desktop
+to capture.
 
 ## Requirements
 

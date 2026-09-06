@@ -35,12 +35,6 @@ Then run `/reload` in pi.
 
 `KEEP_IMAGES` at the top of the extension controls how many trailing images survive. It ships at `1`. Raise it if you routinely compare two screenshots in one turn; each extra image you keep is another full-size blob on every subsequent request.
 
-## Pairs with
-
-[pi-cap-session-watchdog](../pi-cap-session-watchdog) repairs session files
-that already bloated on disk, which this extension deliberately does not touch.
-One works on the payload leaving pi, the other on the file already written.
-
 ## Bundled script: `patch-image-resize-limit.mjs`
 
 This extension prunes images that are *already* in the context. The bundled
