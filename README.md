@@ -2,7 +2,7 @@
 
 ![pi-custom-packages](./assets/banner.png)
 
-Ten small packages for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Nine small packages for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -15,7 +15,7 @@ not because they form a system. Take the one you need.
 
 ## Install
 
-Nine of the ten, straight from git:
+Eight of the nine, straight from git:
 
 ```bash
 pi install git:github.com/Blue-B/pi-custom-packages
@@ -58,16 +58,6 @@ watch for that.
 | [pi-bash-watchdog](./packages/pi-bash-watchdog) | pi's bash timeout is in seconds, and models keep passing milliseconds. Rewrites `120000` to `120`, caps foreground dev servers, fills a default when the field is missing. Adds `/bash-watchdog-status`. |
 | [pi-model-identity](./packages/pi-model-identity) | A model cannot introspect its own weights, so it repeats whatever name is in the prompt. Injects the live model ID on the first turn, on a model switch, and after compaction. Ships `model_identity_status`. |
 
-### Context hygiene
-
-pi resends the whole conversation every turn, images included. Twenty screenshots
-means twenty base64 blobs on turn twenty-one. This package limits the outbound
-payload without modifying session files on disk.
-
-| Package | What it does |
-| --- | --- |
-| [pi-cap-context-images](./packages/pi-cap-context-images) | Keeps the newest image in the outbound payload and turns the older ones into short text placeholders. pi's `images.autoResize` shrinks images on the way in; nothing in pi prunes what is already sitting in the context. |
-
 ### Windows desktop
 
 pi runs in WSL and cannot see the Windows desktop directly. `pi-winshot` captures
@@ -89,8 +79,8 @@ it through `powershell.exe` over WSL interop, with no Linux-side installation.
 
 ## Platform support
 
-Three of the ten need nothing beyond pi itself: bash-watchdog,
-cap-context-images, and model-identity. The other seven each want something specific.
+Two of the nine need nothing beyond pi itself: bash-watchdog
+and model-identity. The other seven each want something specific.
 
 | Needs | Packages |
 | --- | --- |

@@ -1,7 +1,7 @@
 {
   "name": "pi-custom-packages",
   "version": "0.1.0",
-  "description": "Ten packages for the pi coding agent: session guards, context control, Herdr and remote-pi integration, Windows/WSL tools, and Codex account rotation.",
+  "description": "Nine packages for the pi coding agent: session guards, Herdr and remote-pi integration, Windows/WSL tools, and Codex account rotation.",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -25,7 +25,6 @@
   "pi": {
     "extensions": [
       "./packages/pi-bash-watchdog/extensions/bash-watchdog/index.ts",
-      "./packages/pi-cap-context-images/extensions/cap-context-images/index.ts",
       "./packages/pi-codex-accounts/extensions/codex-accounts/index.ts",
       "./packages/pi-gpt-img/extensions/gpt-img/index.ts",
       "./packages/pi-herdr-ask-blocked/extensions/herdr-ask-blocked/index.ts",
