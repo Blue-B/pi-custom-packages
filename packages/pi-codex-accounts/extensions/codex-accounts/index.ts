@@ -6,6 +6,7 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { claimAutoResume, releaseAutoResume } from "./auto-resume.ts";
 import { withFileLock } from "./lock.ts";
 import { modelForAccount } from "./model.ts";
 import {
@@ -118,6 +119,13 @@ const tokenUsagePath = path.join(
 	"agent",
 	"codex-account-usage.json",
 );
+const autoResumePath = path.join(
+	os.homedir(),
+	".pi",
+	"agent",
+	"codex-account-auto-resume.json",
+);
+const autoResumeTtlMs = 30 * 60 * 1000;
 const usageUrl = "https://chatgpt.com/backend-api/wham/usage";
 const cooldowns = new Map<string, number>();
 const limitPattern =
@@ -469,6 +477,14 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 	});
 
 	let usageWrite = Promise.resolve();
+	let autoResumeOwner: string | undefined;
+	const releaseOwnedAutoResume = async () => {
+		if (!autoResumeOwner) return;
+		const owner = autoResumeOwner;
+		autoResumeOwner = undefined;
+		await releaseAutoResume(autoResumePath, owner).catch(() => {});
+	};
+
 	pi.on("message_end", async (event, ctx) => {
 		if (event.message.role !== "assistant") return;
 		if (
@@ -500,6 +516,12 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 				.catch(() => {});
 			await usageWrite;
 		}
+		if (autoResumeOwner)
+			await claimAutoResume(
+				autoResumePath,
+				autoResumeOwner,
+				autoResumeTtlMs,
+			).catch(() => false);
 		if (event.message.stopReason !== "error") return;
 		const error = event.message.errorMessage ?? "";
 		const current = ctx.model?.provider;
@@ -539,11 +561,35 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			return;
 		}
 		if (!(await switchTo(next.provider, ctx, pi))) return;
-		// 자동 재개는 하지 않는다. 한도 오류를 받은 모든 세션이 동시에 다음 턴을 돌리면서
-		// 새 계정 한도까지 연쇄 소진된 사고(2026-09-05)의 직접 원인이었다.
+		const owner = ctx.sessionManager.getSessionId();
+		const claimed = await claimAutoResume(
+			autoResumePath,
+			owner,
+			autoResumeTtlMs,
+		).catch(() => false);
+		if (!claimed) {
+			ctx.ui.notify(
+				`${emailFromToken(next.credential.access)} 계정으로 전환했습니다. 다른 세션이 자동 재개 중이므로 이 세션은 수동으로 이어가세요.`,
+				"warning",
+			);
+			return;
+		}
+		autoResumeOwner = owner;
 		ctx.ui.notify(
-			`${emailFromToken(next.credential.access)} 계정으로 전환했습니다. 이어가려면 직전 요청을 다시 보내세요.`,
+			`${emailFromToken(next.credential.access)} 계정으로 전환하고 자동으로 이어갑니다.`,
 			"warning",
 		);
+		try {
+			pi.sendUserMessage(
+				"계정 한도로 중단된 직전 요청을 반복하지 말고, 미완료 지점부터 이어서 완료하세요.",
+				{ deliverAs: "followUp" },
+			);
+		} catch {
+			await releaseOwnedAutoResume();
+			ctx.ui.notify("자동 재개에 실패했습니다. 수동으로 이어가세요.", "error");
+		}
 	});
+
+	pi.on("agent_settled", releaseOwnedAutoResume);
+	pi.on("session_shutdown", releaseOwnedAutoResume);
 }
