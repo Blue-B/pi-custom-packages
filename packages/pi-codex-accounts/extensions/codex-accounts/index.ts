@@ -6,7 +6,7 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { claimAutoResume, releaseAutoResume } from "./auto-resume.ts";
+import { claimAutoResume, findResumeRequest, releaseAutoResume, resumeMessage } from "./auto-resume.ts";
 import { withFileLock } from "./lock.ts";
 import { modelForAccount } from "./model.ts";
 import {
@@ -527,6 +527,8 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 		const current = ctx.model?.provider;
 		if (!current || !isCodexProvider(current) || !limitPattern.test(error))
 			return;
+		const failedSessionId = ctx.sessionManager.getSessionId();
+		const request = findResumeRequest(ctx.sessionManager.getBranch());
 		const entries = await readAccounts();
 		const currentUsage = await fetchAccount(
 			current,
@@ -560,8 +562,13 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			);
 			return;
 		}
+		if (ctx.sessionManager.getSessionId() !== failedSessionId || ctx.model?.provider !== current) return;
 		if (!(await switchTo(next.provider, ctx, pi))) return;
-		const owner = ctx.sessionManager.getSessionId();
+		if (!request) {
+			ctx.ui.notify("계정을 전환했습니다. 원래 사용자 요청을 확인할 수 없어 자동 재개하지 않습니다.", "warning");
+			return;
+		}
+		const owner = failedSessionId;
 		const claimed = await claimAutoResume(
 			autoResumePath,
 			owner,
@@ -575,15 +582,24 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			return;
 		}
 		autoResumeOwner = owner;
+		if (ctx.sessionManager.getSessionId() !== failedSessionId ||
+			findResumeRequest(ctx.sessionManager.getBranch())?.id !== request.id ||
+			ctx.hasPendingMessages()) {
+			await releaseOwnedAutoResume();
+			ctx.ui.notify("새 요청이나 대화 변경이 있어 이전 요청의 자동 재개를 생략합니다.", "info");
+			return;
+		}
 		ctx.ui.notify(
 			`${emailFromToken(next.credential.access)} 계정으로 전환하고 자동으로 이어갑니다.`,
 			"warning",
 		);
 		try {
-			pi.sendUserMessage(
-				"계정 한도로 중단된 직전 요청을 반복하지 말고, 미완료 지점부터 이어서 완료하세요.",
-				{ deliverAs: "followUp" },
-			);
+			// Steer the retry itself. A follow-up would run AGAIN after Pi's
+			// native 429 retry answers the original request.
+			pi.sendMessage(resumeMessage(request), {
+				deliverAs: "steer",
+				triggerTurn: true,
+			});
 		} catch {
 			await releaseOwnedAutoResume();
 			ctx.ui.notify("자동 재개에 실패했습니다. 수동으로 이어가세요.", "error");
