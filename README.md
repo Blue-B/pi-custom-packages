@@ -2,7 +2,7 @@
 
 ![pi-custom-packages](./assets/banner.png)
 
-Nine small packages for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Eight small packages for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -15,7 +15,7 @@ not because they form a system. Take the one you need.
 
 ## Install
 
-Eight of the nine, straight from git:
+Seven of the eight, straight from git:
 
 ```bash
 pi install git:github.com/Blue-B/pi-custom-packages
@@ -48,15 +48,13 @@ binary); those are listed with the package and again under
 
 ### Guards
 
-Sessions rarely fail loudly. They fail as a wrong timeout unit, a model
-confidently naming the wrong model, a conclusion nobody checked. These three
-watch for that.
+Sessions rarely fail loudly. They fail as a wrong timeout unit or a conclusion
+nobody checked. These two watch for that.
 
 | Package | What it does |
 | --- | --- |
 | [pi-verify-gate](./packages/pi-verify-gate) | `/verify` (alias `/검증`) pulls the raw tool calls and results of the agent's last turn straight out of the session log, writes them to a file, and has a fresh-context `reviewer` subagent grade the conclusion against them. The agent never picks the target or supplies the evidence. Needs [pi-subagents](https://www.npmjs.com/package/pi-subagents). |
 | [pi-bash-watchdog](./packages/pi-bash-watchdog) | pi's bash timeout is in seconds, and models keep passing milliseconds. Rewrites `120000` to `120`, caps foreground dev servers, fills a default when the field is missing. Adds `/bash-watchdog-status`. |
-| [pi-model-identity](./packages/pi-model-identity) | A model cannot introspect its own weights, so it repeats whatever name is in the prompt. Injects the live model ID on the first turn, on a model switch, and after compaction. Ships `model_identity_status`. |
 
 ### Windows desktop
 
@@ -79,8 +77,8 @@ it through `powershell.exe` over WSL interop, with no Linux-side installation.
 
 ## Platform support
 
-Two of the nine need nothing beyond pi itself: bash-watchdog
-and model-identity. The other seven each want something specific.
+One of the eight needs nothing beyond pi itself: bash-watchdog.
+The other seven each want something specific.
 
 | Needs | Packages |
 | --- | --- |
