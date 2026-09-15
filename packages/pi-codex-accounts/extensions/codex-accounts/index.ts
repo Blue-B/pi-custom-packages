@@ -1,19 +1,15 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { isRetryableAssistantError } from "@earendil-works/pi-ai/compat";
 import {
 	ModelRuntime,
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { claimAutoResume, findResumeRequest, releaseAutoResume, resumeMessage } from "./auto-resume.ts";
 import { withFileLock } from "./lock.ts";
 import { modelForAccount } from "./model.ts";
-import {
-	exhaustedResetAt,
-	isAccountAvailable,
-	type Window,
-} from "./quota.ts";
+import { exhaustedResetAt, isAccountAvailable, type Window } from "./quota.ts";
 
 type Credential = {
 	type?: string;
@@ -119,13 +115,6 @@ const tokenUsagePath = path.join(
 	"agent",
 	"codex-account-usage.json",
 );
-const autoResumePath = path.join(
-	os.homedir(),
-	".pi",
-	"agent",
-	"codex-account-auto-resume.json",
-);
-const autoResumeTtlMs = 30 * 60 * 1000;
 const usageUrl = "https://chatgpt.com/backend-api/wham/usage";
 const cooldowns = new Map<string, number>();
 const limitPattern =
@@ -160,9 +149,7 @@ async function readAccounts(): Promise<[string, Credential][]> {
 function emailFromToken(token = ""): string {
 	try {
 		const [, payloadPart] = token.split(".");
-		const payload = JSON.parse(
-			Buffer.from(payloadPart, "base64url").toString(),
-		);
+		const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString());
 		return (
 			payload["https://api.openai.com/profile"]?.email ??
 			payload.email ??
@@ -311,18 +298,25 @@ function row(
 	return `${marker} ${n}번  ${account.email}  5h:${pTxt} · 7d:${sTxt}${cur}`;
 }
 
-function detailRow(account: Account, usage: TokenUsage | undefined, current?: string): string {
+function detailRow(
+	account: Account,
+	usage: TokenUsage | undefined,
+	current?: string,
+): string {
 	const isCurrent = account.provider === current;
 	const marker = isCurrent ? "●" : "○";
 	const curTag = isCurrent ? "  ← 현재 사용 중" : "";
-	if (account.error) return `  ${marker} ${accountNumber(account.provider)}번  ${account.email}  오류: ${account.error}${curTag}`;
+	if (account.error)
+		return `  ${marker} ${accountNumber(account.provider)}번  ${account.email}  오류: ${account.error}${curTag}`;
 	const n = String(accountNumber(account.provider)).padStart(2, " ");
 	const pLabel = windowLabel(account.primary, "5h");
 	const sLabel = windowLabel(account.secondary, "7d");
 	const pRem = remaining(account.primary);
 	const sRem = remaining(account.secondary);
-	const pPct = pRem === undefined ? "?" : `${String(pRem).padStart(3, " ")}% 남음`;
-	const sPct = sRem === undefined ? "?" : `${String(sRem).padStart(3, " ")}% 남음`;
+	const pPct =
+		pRem === undefined ? "?" : `${String(pRem).padStart(3, " ")}% 남음`;
+	const sPct =
+		sRem === undefined ? "?" : `${String(sRem).padStart(3, " ")}% 남음`;
 	const tokens = usage
 		? `토큰 ${formatTokens(usage.total)} (캐시 ${formatTokens(usage.cacheRead)})`
 		: "토큰 0";
@@ -334,14 +328,22 @@ function detailRow(account: Account, usage: TokenUsage | undefined, current?: st
 	].join("\n");
 }
 
-function buildTable(accounts: Account[], tokenUsage: TokenUsageState, current?: string): string {
+function buildTable(
+	accounts: Account[],
+	tokenUsage: TokenUsageState,
+	current?: string,
+): string {
 	const header = " Codex 계정별 남은 한도 (5시간 · 7일)";
-	const lines = accounts.map((a) => detailRow(a, tokenUsage[a.provider], current));
+	const lines = accounts.map((a) =>
+		detailRow(a, tokenUsage[a.provider], current),
+	);
 	let curLine = "";
 	if (current) {
 		if (isCodexProvider(current)) {
 			const curAcc = accounts.find((a) => a.provider === current);
-			curLine = curAcc ? ` │ 현재: ${curAcc.email} (${accountNumber(current)}번) ●` : ` │ 현재: ${current}`;
+			curLine = curAcc
+				? ` │ 현재: ${curAcc.email} (${accountNumber(current)}번) ●`
+				: ` │ 현재: ${current}`;
 		} else {
 			curLine = ` │ 현재 모델: ${current} (Codex 아님)`;
 		}
@@ -377,9 +379,7 @@ async function switchTo(
 		provider,
 		ctx.model,
 		preferredId ? ctx.modelRegistry.find(provider, preferredId) : undefined,
-		ctx.modelRegistry
-			.getAvailable()
-			.find((model) => model.provider === provider),
+		ctx.modelRegistry.getAvailable().find((model) => model.provider === provider),
 	);
 	if (!target) {
 		ctx.ui.notify(
@@ -445,7 +445,9 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 				if (usageChanged) await writeTokenUsage(tokenUsage);
 				// 상세 표는 위젯으로 띄워 명령어 닫히면 자동 사라지게 함
 				const table = buildTable(loaded, tokenUsage, ctx.model?.provider);
-				ctx.ui.setWidget("codex-accounts-table", table.split("\n"), { placement: "aboveEditor" });
+				ctx.ui.setWidget("codex-accounts-table", table.split("\n"), {
+					placement: "aboveEditor",
+				});
 				const rows = loaded.map((account) =>
 					row(account, ctx.model?.provider, tokenUsage[account.provider]),
 				);
@@ -477,16 +479,73 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 	});
 
 	let usageWrite = Promise.resolve();
-	let autoResumeOwner: string | undefined;
-	const releaseOwnedAutoResume = async () => {
-		if (!autoResumeOwner) return;
-		const owner = autoResumeOwner;
-		autoResumeOwner = undefined;
-		await releaseAutoResume(autoResumePath, owner).catch(() => {});
+	let revision = 0;
+	let pendingRetry:
+		| {
+				message: object;
+				sessionId: string;
+				model: ExtensionContext["model"];
+				signal: AbortSignal | undefined;
+				revision: number;
+		  }
+		| undefined;
+	const invalidateRetry = () => {
+		revision++;
+		pendingRetry = undefined;
 	};
+	pi.on("input", invalidateRetry);
+	pi.on("message_start", invalidateRetry);
+	pi.on("session_before_switch", invalidateRetry);
+	pi.on("session_before_tree", invalidateRetry);
+	pi.on("session_shutdown", invalidateRetry);
+
+	pi.on("agent_settled", (_event, ctx) => {
+		const retry = pendingRetry;
+		pendingRetry = undefined; // Consume before sending: at most once per failed response.
+		if (
+			!retry ||
+			retry.revision !== revision ||
+			retry.signal?.aborted ||
+			!ctx.isIdle() ||
+			ctx.hasPendingMessages() ||
+			ctx.model !== retry.model ||
+			ctx.sessionManager.getSessionId() !== retry.sessionId
+		)
+			return;
+		const leaf = ctx.sessionManager.getBranch().at(-1);
+		if (
+			leaf?.type !== "message" ||
+			leaf.message !== retry.message ||
+			leaf.message.role !== "assistant" ||
+			leaf.message.stopReason !== "error"
+		)
+			return;
+		pi.sendMessage(
+			{
+				customType: "codex-account-retry",
+				display: true,
+				details: { failedMessageId: leaf.id },
+				content:
+					"계정 전환이 완료됐습니다. 바로 앞 한도 오류로 중단된 현재 응답만 이어가세요. 이미 완료한 일이나 과거 대화의 작업을 다시 시작하지 마세요.",
+			},
+			{ triggerTurn: true },
+		);
+	});
 
 	pi.on("message_end", async (event, ctx) => {
 		if (event.message.role !== "assistant") return;
+		const failedSessionId = ctx.sessionManager.getSessionId();
+		const failedLeafId = ctx.sessionManager.getLeafId();
+		const failedModel = ctx.model;
+		const failedSignal = ctx.signal;
+		const failedRevision = revision;
+		const stillCurrent = () =>
+			revision === failedRevision &&
+			!failedSignal?.aborted &&
+			ctx.sessionManager.getSessionId() === failedSessionId &&
+			ctx.sessionManager.getLeafId() === failedLeafId &&
+			ctx.model === failedModel &&
+			!ctx.hasPendingMessages();
 		if (
 			isCodexProvider(event.message.provider) &&
 			event.message.usage.totalTokens > 0
@@ -516,19 +575,17 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 				.catch(() => {});
 			await usageWrite;
 		}
-		if (autoResumeOwner)
-			await claimAutoResume(
-				autoResumePath,
-				autoResumeOwner,
-				autoResumeTtlMs,
-			).catch(() => false);
 		if (event.message.stopReason !== "error") return;
 		const error = event.message.errorMessage ?? "";
 		const current = ctx.model?.provider;
-		if (!current || !isCodexProvider(current) || !limitPattern.test(error))
+		if (
+			!current ||
+			event.message.provider !== current ||
+			!isCodexProvider(current) ||
+			!limitPattern.test(error) ||
+			!stillCurrent()
+		)
 			return;
-		const failedSessionId = ctx.sessionManager.getSessionId();
-		const request = findResumeRequest(ctx.sessionManager.getBranch());
 		const entries = await readAccounts();
 		const currentUsage = await fetchAccount(
 			current,
@@ -556,56 +613,30 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 				isAccountAvailable(usage),
 		);
 		if (!next) {
-			ctx.ui.notify(
-				"모든 Codex 계정이 한도 소진 또는 대기 상태입니다.",
-				"error",
-			);
+			ctx.ui.notify("모든 Codex 계정이 한도 소진 또는 대기 상태입니다.", "error");
 			return;
 		}
-		if (ctx.sessionManager.getSessionId() !== failedSessionId || ctx.model?.provider !== current) return;
+		if (!stillCurrent()) return;
 		if (!(await switchTo(next.provider, ctx, pi))) return;
-		if (!request) {
-			ctx.ui.notify("계정을 전환했습니다. 원래 사용자 요청을 확인할 수 없어 자동 재개하지 않습니다.", "warning");
-			return;
-		}
-		const owner = failedSessionId;
-		const claimed = await claimAutoResume(
-			autoResumePath,
-			owner,
-			autoResumeTtlMs,
-		).catch(() => false);
-		if (!claimed) {
-			ctx.ui.notify(
-				`${emailFromToken(next.credential.access)} 계정으로 전환했습니다. 다른 세션이 자동 재개 중이므로 이 세션은 수동으로 이어가세요.`,
-				"warning",
-			);
-			return;
-		}
-		autoResumeOwner = owner;
-		if (ctx.sessionManager.getSessionId() !== failedSessionId ||
-			findResumeRequest(ctx.sessionManager.getBranch())?.id !== request.id ||
-			ctx.hasPendingMessages()) {
-			await releaseOwnedAutoResume();
-			ctx.ui.notify("새 요청이나 대화 변경이 있어 이전 요청의 자동 재개를 생략합니다.", "info");
-			return;
+		if (
+			!isRetryableAssistantError(event.message) &&
+			revision === failedRevision &&
+			!failedSignal?.aborted &&
+			ctx.sessionManager.getSessionId() === failedSessionId &&
+			!ctx.hasPendingMessages()
+		) {
+			// Never compete with native retries, including a cancelled retry backoff.
+			pendingRetry = {
+				message: event.message,
+				sessionId: failedSessionId,
+				model: ctx.model,
+				signal: failedSignal,
+				revision,
+			};
 		}
 		ctx.ui.notify(
-			`${emailFromToken(next.credential.access)} 계정으로 전환하고 자동으로 이어갑니다.`,
+			`${emailFromToken(next.credential.access)} 계정으로 전환했습니다. 같은 오류로 멈춰 있으면 현재 응답만 자동으로 이어갑니다.`,
 			"warning",
 		);
-		try {
-			// Steer the retry itself. A follow-up would run AGAIN after Pi's
-			// native 429 retry answers the original request.
-			pi.sendMessage(resumeMessage(request), {
-				deliverAs: "steer",
-				triggerTurn: true,
-			});
-		} catch {
-			await releaseOwnedAutoResume();
-			ctx.ui.notify("자동 재개에 실패했습니다. 수동으로 이어가세요.", "error");
-		}
 	});
-
-	pi.on("agent_settled", releaseOwnedAutoResume);
-	pi.on("session_shutdown", releaseOwnedAutoResume);
 }
