@@ -25,13 +25,23 @@ test("prefers the registered model of the target account", () => {
 	);
 });
 
-test("never falls back to an unintended model", () => {
-	// 폴백하면 사용자가 더 낮은 모델로 잘못 호출됐는지 알 수 없다.
-	// 유지할 수 없으면 undefined를 반환하고 호출부가 계정 전환을 중단한다.
+test("switches from another provider to an available Codex model", () => {
 	const foreign = { provider: "commandcode", id: "deepseek/deepseek-v4.1-flash" };
+	const available = { provider: "openai-codex-account-2", id: "gpt-6-sol" };
 
-	assert.equal(modelForAccount("openai-codex-account-2", undefined, undefined), undefined);
+	assert.equal(modelForAccount("openai-codex-account-2", foreign, undefined, available), available);
+	assert.equal(modelForAccount("openai-codex-account-2", undefined, undefined, available), available);
 	assert.equal(modelForAccount("openai-codex-account-2", foreign, undefined), undefined);
+	assert.equal(modelForAccount("openai-codex-account-2", undefined, undefined), undefined);
+});
+
+test("does not silently change a Codex model during account rotation", () => {
+	const current = { provider: "openai-codex", id: "gpt-6-astra" };
+	const available = { provider: "openai-codex-account-2", id: "gpt-5.6-sol" };
+	assert.deepEqual(modelForAccount(available.provider, current, undefined, available), {
+		...current,
+		provider: available.provider,
+	});
 });
 
 test("keeps the account when /model picks a shared-alias model", () => {

@@ -353,6 +353,19 @@ function buildTable(
 	return [header + curLine, "─".repeat(72), ...lines].join("\n");
 }
 
+function retryCountSinceLastUser(ctx: ExtensionContext): number {
+	let retries = 0;
+	for (const entry of ctx.sessionManager.getBranch()) {
+		if (entry.type !== "message") continue;
+		if (entry.message.role === "user") retries = 0;
+		else if (
+			entry.message.role === "custom" &&
+			entry.message.customType === "codex-account-retry"
+		) retries++;
+	}
+	return retries;
+}
+
 function aliasModel(model: ReturnType<ModelRuntime["getModels"]>[number]) {
 	return {
 		id: model.id,
@@ -379,12 +392,10 @@ async function switchTo(
 		provider,
 		ctx.model,
 		preferredId ? ctx.modelRegistry.find(provider, preferredId) : undefined,
+		ctx.modelRegistry.getAvailable().find((model) => model.provider === provider),
 	);
 	if (!target) {
-		ctx.ui.notify(
-			`${provider}로 전환할 모델을 찾지 못해 계정을 바꾸지 않았습니다. 현재 모델(${preferredId ?? "없음"})이 그 계정에 없습니다. /model로 모델을 고른 뒤 다시 시도하세요.`,
-			"error",
-		);
+		ctx.ui.notify(`${provider}에서 사용할 Codex 모델을 찾지 못했습니다.`, "error");
 		return false;
 	}
 	return pi.setModel(target);
@@ -469,7 +480,7 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 				}
 				if (await switchTo(selected.provider, ctx, pi)) {
 					ctx.ui.setWidget("codex-accounts-table", undefined);
-					ctx.ui.notify(`${selected.email} 계정으로 전환했습니다.`, "info");
+					ctx.ui.notify(`${selected.email} 계정으로 전환했습니다. 모델: ${ctx.model?.id}`, "info");
 					return;
 				}
 				ctx.ui.setWidget("codex-accounts-table", undefined);
@@ -502,6 +513,7 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 				model: ExtensionContext["model"];
 				signal: AbortSignal | undefined;
 				revision: number;
+				maxRetries: number;
 		  }
 		| undefined;
 	const invalidateRetry = () => {
@@ -527,8 +539,10 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			ctx.sessionManager.getSessionId() !== retry.sessionId
 		)
 			return;
-		const leaf = ctx.sessionManager.getBranch().at(-1);
+		const branch = ctx.sessionManager.getBranch();
+		const leaf = branch.at(-1);
 		if (
+			retryCountSinceLastUser(ctx) >= retry.maxRetries ||
 			leaf?.type !== "message" ||
 			leaf.message !== retry.message ||
 			leaf.message.role !== "assistant" ||
@@ -602,6 +616,13 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 		)
 			return;
 		const entries = await readAccounts();
+		if (
+			!isRetryableAssistantError(event.message) &&
+			retryCountSinceLastUser(ctx) >= Math.max(0, entries.length - 1)
+		) {
+			ctx.ui.notify("이 요청의 Codex 자동 재개 횟수를 모두 사용했습니다. 직접 다시 요청하세요.", "error");
+			return;
+		}
 		const currentUsage = await fetchAccount(
 			current,
 			Object.fromEntries(entries)[current] ?? {},
@@ -647,6 +668,7 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 				model: ctx.model,
 				signal: failedSignal,
 				revision,
+				maxRetries: Math.max(0, entries.length - 1),
 			};
 		}
 		ctx.ui.notify(

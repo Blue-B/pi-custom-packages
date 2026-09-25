@@ -33,8 +33,9 @@ test("/model keeps the selected Codex account", { timeout: 30000 }, async () => 
 	const extension =
 		process.env.CODEX_ACCOUNTS_ENTRY ??
 		path.resolve("packages/pi-codex-accounts/extensions/codex-accounts/index.ts");
-	mock.method(globalThis, "fetch", async () => {
-		throw new Error("no network access allowed in this test");
+	mock.method(globalThis, "fetch", async (url: unknown) => {
+		assert.equal(String(url), "https://chatgpt.com/backend-api/wham/usage");
+		return new Response(JSON.stringify({ rate_limit: { allowed: true } }));
 	});
 	try {
 		const runtime = await ModelRuntime.create();
@@ -88,6 +89,28 @@ test("/model keeps the selected Codex account", { timeout: 30000 }, async () => 
 				runtime.getModel("openai-codex-account-2", "gpt-6-astra")!,
 			);
 			assert.equal(session.model?.provider, "openai-codex-account-2");
+
+			// DeepSeek 같은 다른 제공자에서 /codex-accounts로 2번을 고른다.
+			await session.setModel({
+				...runtime.getModel("openai-codex", "gpt-6-astra")!,
+				provider: "commandcode",
+				id: "deepseek/deepseek-v4.1-flash",
+			});
+			const command = loader.getExtensions().extensions[0].commands.get("codex-accounts")!;
+			const notices: string[] = [];
+			await command.handler("", {
+				get model() { return session.model; },
+				modelRegistry: (session as any)._extensionRunner.getModelRegistry(),
+				ui: {
+					setWidget() {},
+					select: async (_title: string, choices: string[]) => choices[1],
+					notify: (message: string) => notices.push(message),
+				},
+			} as any);
+			assert.equal(session.model?.provider, "openai-codex-account-2");
+			assert.notEqual(session.model?.id, "deepseek/deepseek-v4.1-flash");
+			assert.ok(runtime.getModel("openai-codex-account-2", session.model!.id));
+			assert.ok(notices.at(-1)?.includes(`모델: ${session.model!.id}`));
 		} finally {
 			session.dispose();
 		}

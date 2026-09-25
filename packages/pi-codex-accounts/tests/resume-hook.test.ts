@@ -138,6 +138,14 @@ test("only the settled current failure resumes, without replaying a user request
 				ctx,
 				emit,
 				append,
+				appendRetryNotice: () =>
+					(ctx.sessionManager as SessionManager).appendMessage({
+						role: "custom",
+						customType: "codex-account-retry",
+						content: "previous continuation",
+						display: true,
+						timestamp: Date.now(),
+					}),
 				fail,
 				sent,
 				aborter,
@@ -174,6 +182,19 @@ test("only the settled current failure resumes, without replaying a user request
 				);
 			},
 		);
+		await t.test("a session reload cannot restart an exhausted retry chain", async () => {
+			const f = await fixture();
+			f.appendRetryNotice();
+			f.appendRetryNotice();
+			await f.fail();
+			await f.settle();
+			assert.equal(f.sent.length, 0);
+			assert.equal(f.switches(), 0, "an exhausted chain must not rotate again");
+			f.append("new user request");
+			await f.fail();
+			await f.settle();
+			assert.equal(f.sent.length, 1, "a new request gets its own retry budget");
+		});
 		for (const action of [
 			"input",
 			"message_start",
