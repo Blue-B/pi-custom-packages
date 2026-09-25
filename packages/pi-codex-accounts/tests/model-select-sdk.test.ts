@@ -111,6 +111,20 @@ test("/model keeps the selected Codex account", { timeout: 30000 }, async () => 
 			assert.notEqual(session.model?.id, "deepseek/deepseek-v4.1-flash");
 			assert.ok(runtime.getModel("openai-codex-account-2", session.model!.id));
 			assert.ok(notices.at(-1)?.includes(`모델: ${session.model!.id}`));
+
+			// 명시적인 1번 계정 선택은 /model의 계정 유지와 다르다.
+			const selectedModel = session.model!.id;
+			await command.handler("", {
+				get model() { return session.model; },
+				modelRegistry: (session as any)._extensionRunner.getModelRegistry(),
+				ui: {
+					setWidget() {},
+					select: async (_title: string, choices: string[]) => choices[0],
+					notify: (message: string) => notices.push(message),
+				},
+			} as any);
+			assert.equal(session.model?.provider, "openai-codex");
+			assert.equal(session.model?.id, selectedModel);
 		} finally {
 			session.dispose();
 		}

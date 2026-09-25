@@ -139,13 +139,9 @@ test("only the settled current failure resumes, without replaying a user request
 				emit,
 				append,
 				appendRetryNotice: () =>
-					(ctx.sessionManager as SessionManager).appendMessage({
-						role: "custom",
-						customType: "codex-account-retry",
-						content: "previous continuation",
-						display: true,
-						timestamp: Date.now(),
-					}),
+					(ctx.sessionManager as SessionManager).appendCustomMessageEntry(
+						"codex-account-retry", "previous continuation", true,
+					),
 				fail,
 				sent,
 				aborter,

@@ -55,14 +55,20 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 	try {
 		// One runtime per case prevents test provider registrations from leaking to another case.
 		const originalCreate = ModelRuntime.create.bind(ModelRuntime);
+		const originalNow = Date.now;
+		let clockOffset = 0;
+		mock.method(Date, "now", () => originalNow() + clockOffset);
 		for (const scenario of [
 			"usage-limit",
+			"reverse-usage-limit",
 			"native-retry",
 			"abort",
 			"abort-backoff",
 			"all-exhausted",
 		]) {
 			await t.test(scenario, async () => {
+				// Loaded modules retain cooldowns; expire previous cases without real waiting.
+				clockOffset += 2 * 60 * 60 * 1000;
 				const runtime = await originalCreate();
 				const originalModel = runtime.getModels("openai-codex")[0];
 				assert.ok(originalModel);
@@ -155,6 +161,9 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 							});
 					});
 				try {
+					if (scenario === "reverse-usage-limit") {
+						await session.setModel(runtime.getModel(providers[2], originalModel.id)!);
+					}
 					await session.prompt("안녕");
 					await session.waitForIdle();
 					await aborted;
@@ -175,7 +184,7 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 							? 3
 							: 2;
 					const expectedNotices =
-						scenario === "usage-limit" ? 1 : scenario === "all-exhausted" ? 2 : 0;
+						scenario.endsWith("usage-limit") ? 1 : scenario === "all-exhausted" ? 2 : 0;
 					assert.equal(calls.length, expectedCalls);
 					assert.equal(notices.length, expectedNotices);
 					assert.equal(
@@ -183,7 +192,12 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 						1,
 						"no duplicated user request",
 					);
-					if (expectedCalls > 1) assert.equal(calls[1], providers[1]);
+					if (expectedCalls > 1) {
+						assert.equal(calls[1], providers[scenario === "reverse-usage-limit" ? 0 : 1]);
+					}
+					if (!scenario.startsWith("abort")) {
+						assert.equal(session.model?.provider, calls.at(-1));
+					}
 					for (const context of contexts)
 						assert.equal(
 							context.filter(

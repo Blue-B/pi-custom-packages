@@ -356,6 +356,10 @@ function buildTable(
 function retryCountSinceLastUser(ctx: ExtensionContext): number {
 	let retries = 0;
 	for (const entry of ctx.sessionManager.getBranch()) {
+		if (entry.type === "custom_message" && entry.customType === "codex-account-retry") {
+			retries++;
+			continue;
+		}
 		if (entry.type !== "message") continue;
 		if (entry.message.role === "user") retries = 0;
 		else if (
@@ -425,6 +429,16 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 		});
 	}
 
+	let switchingAccount = false;
+	async function switchAccount(provider: string, ctx: ExtensionContext) {
+		switchingAccount = true;
+		try {
+			return (await switchTo(provider, ctx, pi)) && ctx.model?.provider === provider;
+		} finally {
+			switchingAccount = false;
+		}
+	}
+
 	pi.registerCommand("codex-accounts", {
 		description: "Codex 계정별 한도를 보고 선택한 계정으로 전환",
 		handler: async (_args, ctx) => {
@@ -478,7 +492,7 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 					ctx.ui.setWidget("codex-accounts-table", undefined);
 					return;
 				}
-				if (await switchTo(selected.provider, ctx, pi)) {
+				if (await switchAccount(selected.provider, ctx)) {
 					ctx.ui.setWidget("codex-accounts-table", undefined);
 					ctx.ui.notify(`${selected.email} 계정으로 전환했습니다. 모델: ${ctx.model?.id}`, "info");
 					return;
@@ -492,6 +506,8 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 	// 모델만 바꾸면 provider가 공유 별칭으로 바뀌며 계정이 1번으로 되돌아간다.
 	// 이때 고른 모델 ID는 그대로 두고 현재 계정만 유지한다.
 	pi.on("model_select", async (event) => {
+		// 명시적인 계정 전환(수동/자동)은 /model의 계정 유지 대상이 아니다.
+		if (switchingAccount) return;
 		const keep = accountToKeep(
 			event.previousModel?.provider,
 			event.model.provider,
@@ -653,7 +669,7 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 			return;
 		}
 		if (!stillCurrent()) return;
-		if (!(await switchTo(next.provider, ctx, pi))) return;
+		if (!(await switchAccount(next.provider, ctx))) return;
 		if (
 			!isRetryableAssistantError(event.message) &&
 			revision === failedRevision &&
