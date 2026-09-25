@@ -8,7 +8,7 @@ import {
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { withFileLock } from "./lock.ts";
-import { modelForAccount } from "./model.ts";
+import { accountToKeep, modelForAccount } from "./model.ts";
 import { exhaustedResetAt, isAccountAvailable, type Window } from "./quota.ts";
 
 type Credential = {
@@ -379,11 +379,10 @@ async function switchTo(
 		provider,
 		ctx.model,
 		preferredId ? ctx.modelRegistry.find(provider, preferredId) : undefined,
-		ctx.modelRegistry.getAvailable().find((model) => model.provider === provider),
 	);
 	if (!target) {
 		ctx.ui.notify(
-			`${provider}에서 사용할 모델을 찾지 못했습니다. /reload 후 다시 시도하세요.`,
+			`${provider}로 전환할 모델을 찾지 못해 계정을 바꾸지 않았습니다. 현재 모델(${preferredId ?? "없음"})이 그 계정에 없습니다. /model로 모델을 고른 뒤 다시 시도하세요.`,
 			"error",
 		);
 		return false;
@@ -476,6 +475,22 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 				ctx.ui.setWidget("codex-accounts-table", undefined);
 			}
 		},
+	});
+
+	// /model은 공유 별칭 openai-codex의 모델만 노출한다. 계정 별칭을 쓰는 중에
+	// 모델만 바꾸면 provider가 공유 별칭으로 바뀌며 계정이 1번으로 되돌아간다.
+	// 이때 고른 모델 ID는 그대로 두고 현재 계정만 유지한다.
+	pi.on("model_select", async (event) => {
+		const keep = accountToKeep(
+			event.previousModel?.provider,
+			event.model.provider,
+		);
+		if (!keep) return;
+		const target = {
+			...event.model,
+			provider: keep,
+		};
+		await pi.setModel(target);
 	});
 
 	let usageWrite = Promise.resolve();
