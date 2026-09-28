@@ -396,7 +396,7 @@ async function switchTo(
 		provider,
 		ctx.model,
 		preferredId ? ctx.modelRegistry.find(provider, preferredId) : undefined,
-		ctx.modelRegistry.getAvailable().find((model) => model.provider === provider),
+		ctx.modelRegistry.find(provider, "gpt-6-sol"),
 	);
 	if (!target) {
 		ctx.ui.notify(`${provider}에서 사용할 Codex 모델을 찾지 못했습니다.`, "error");

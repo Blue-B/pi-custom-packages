@@ -108,7 +108,7 @@ test("/model keeps the selected Codex account", { timeout: 30000 }, async () => 
 				},
 			} as any);
 			assert.equal(session.model?.provider, "openai-codex-account-2");
-			assert.notEqual(session.model?.id, "deepseek/deepseek-v4.1-flash");
+			assert.equal(session.model?.id, "gpt-6-sol", "a new Codex selection defaults to Sol, not the first registered model");
 			assert.ok(runtime.getModel("openai-codex-account-2", session.model!.id));
 			assert.ok(notices.at(-1)?.includes(`모델: ${session.model!.id}`));
 
