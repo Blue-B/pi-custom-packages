@@ -17,9 +17,8 @@ test("only the settled current failure resumes, without replaying a user request
 	const agentDir = path.join(home, ".pi", "agent");
 	await fs.mkdir(agentDir, { recursive: true });
 	const providers = [
-		"openai-codex",
-		"openai-codex-account-2",
-		"openai-codex-account-3",
+		"openai",
+		"openai-account-2",
 	];
 	await fs.writeFile(
 		path.join(agentDir, "auth.json"),
@@ -30,26 +29,28 @@ test("only the settled current failure resumes, without replaying a user request
 		),
 	);
 	mock.method(ModelRuntime, "create", async () => ({
-		getProvider: () => ({ auth: { oauth: { name: "fixture" } } }),
-		getModels: () => [],
+		getProvider: () => ({ auth: { oauth: { name: "fixture" } }, getModels: () => [], getAllModels: () => [] }),
 	}));
-	let duringFetch: (() => void) | undefined;
-	let available = true;
-	mock.method(globalThis, "fetch", async () => {
-		const callback = duringFetch;
-		duringFetch = undefined;
-		callback?.();
-		return new Response(
-			JSON.stringify({
-				rate_limit: {
-					allowed: available,
-					primary_window: { used_percent: available ? 10 : 100 },
-				},
-			}),
-		);
+	let duringRead: (() => void) | undefined;
+	const readFile = fs.readFile.bind(fs);
+	mock.method(fs, "readFile", async (...args: any[]) => {
+		const result = await (readFile as any)(...args);
+		if (String(args[0]) === path.join(agentDir, "auth.json")) {
+			const callback = duringRead;
+			duringRead = undefined;
+			callback?.();
+		}
+		return result;
 	});
+	mock.method(globalThis, "fetch", async () => {
+		assert.fail("Account selection must not make quota HTTP requests");
+	});
+	const originalNow = Date.now;
+	let offset = 0;
+	mock.method(Date, "now", () => originalNow() + offset);
 	try {
 		async function fixture() {
+			offset += 2 * 60 * 60 * 1000;
 			const loader = new DefaultResourceLoader({
 				cwd: home,
 				agentDir,
@@ -77,7 +78,7 @@ test("only the settled current failure resumes, without replaying a user request
 			const model = (provider: string) => ({
 				provider,
 				id: "scope-fixture",
-				api: "openai-codex-responses",
+				api: "openai-responses",
 			});
 			const ctx = {
 				model: model(providers[0]),
@@ -241,10 +242,10 @@ test("only the settled current failure resumes, without replaying a user request
 			"pending",
 		]) {
 			await t.test(
-				`${action} during quota lookup prevents stale failover`,
+				`${action} during account lookup prevents stale failover`,
 				async () => {
 					const f = await fixture();
-					duringFetch = () => {
+					duringRead = () => {
 						if (action === "abort") f.aborter.abort();
 						if (action === "input") f.emit("input");
 						if (action === "session")
@@ -268,13 +269,7 @@ test("only the settled current failure resumes, without replaying a user request
 				await f.fail();
 				await f.settle();
 				assert.equal(f.sent.length, 0);
-				available = false;
-				const g = await fixture();
-				await g.fail();
-				await g.settle();
-				assert.equal(g.switches(), 0);
-				assert.equal(g.sent.length, 0);
-				available = true;
+
 			},
 		);
 		await t.test(

@@ -1,7 +1,7 @@
 {
   "name": "pi-codex-accounts",
   "version": "0.1.0",
-  "description": "Multi-account manager for ChatGPT Codex in pi: auto-rotates on 429/quota, shows 5h/7d bars with absolute reset dates, token usage per 5h window, and current-account highlighting.",
+  "description": "Two ChatGPT subscription accounts for pi: native OpenAI OAuth, account-preserving model selection, and bounded quota failover. Requires Pi 0.99.2 or newer.",
   "keywords": [
     "pi-package",
     "pi",
@@ -9,7 +9,7 @@
     "pi-extension",
     "extension",
     "codex",
-    "openai-codex",
+    "openai",
     "chatgpt",
     "multi-account",
     "quota",
@@ -37,6 +37,7 @@
     "node": ">=18"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.85.1"
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-ai": "*"
   }
 }

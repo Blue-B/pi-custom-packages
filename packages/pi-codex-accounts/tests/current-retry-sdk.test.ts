@@ -11,7 +11,7 @@ import {
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
-// Real Pi lifecycle and installed extension; only quota HTTP/auth and model responses are fake.
+// Real Pi lifecycle and installed extension; auth and model responses are fake.
 test("installed failover cooperates with the actual Pi retry/settled lifecycle", {
 	timeout: 30000,
 }, async (t) => {
@@ -21,9 +21,8 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 	const agentDir = path.join(home, ".pi", "agent");
 	await fs.mkdir(agentDir, { recursive: true });
 	const providers = [
-		"openai-codex",
-		"openai-codex-account-2",
-		"openai-codex-account-3",
+		"openai",
+		"openai-account-2",
 	];
 	await fs.writeFile(
 		path.join(agentDir, "auth.json"),
@@ -36,21 +35,19 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 	const extension =
 		process.env.CODEX_ACCOUNTS_ENTRY ??
 		path.resolve("packages/pi-codex-accounts/extensions/codex-accounts/index.ts");
-	let abortOnFetch: (() => void) | undefined;
-	mock.method(globalThis, "fetch", async (url: unknown) => {
-		assert.equal(
-			String(url),
-			"https://chatgpt.com/backend-api/wham/usage",
-			"No model or authentication network access allowed",
-		);
-		const callback = abortOnFetch;
-		abortOnFetch = undefined;
-		callback?.();
-		return new Response(
-			JSON.stringify({
-				rate_limit: { allowed: true, primary_window: { used_percent: 10 } },
-			}),
-		);
+	let abortOnRead: (() => void) | undefined;
+	const readFile = fs.readFile.bind(fs);
+	mock.method(fs, "readFile", async (...args: any[]) => {
+		const result = await (readFile as any)(...args);
+		if (String(args[0]) === path.join(agentDir, "auth.json")) {
+			const callback = abortOnRead;
+			abortOnRead = undefined;
+			callback?.();
+		}
+		return result;
+	});
+	mock.method(globalThis, "fetch", async () => {
+		assert.fail("No quota, model or authentication network access allowed");
 	});
 	try {
 		// One runtime per case prevents test provider registrations from leaking to another case.
@@ -70,7 +67,7 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 				// Loaded modules retain cooldowns; expire previous cases without real waiting.
 				clockOffset += 2 * 60 * 60 * 1000;
 				const runtime = await originalCreate();
-				const originalModel = runtime.getModels("openai-codex")[0];
+				const originalModel = runtime.getModels("openai")[0];
 				assert.ok(originalModel);
 				mock.method(ModelRuntime, "create", async () => runtime);
 				mock.method(runtime, "checkAuth", async () => true);
@@ -150,7 +147,7 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 				});
 				let aborted: Promise<void> | undefined;
 				if (scenario === "abort")
-					abortOnFetch = () => {
+					abortOnRead = () => {
 						aborted = session.abort();
 					};
 				if (scenario === "abort-backoff")
@@ -162,7 +159,7 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 					});
 				try {
 					if (scenario === "reverse-usage-limit") {
-						await session.setModel(runtime.getModel(providers[2], originalModel.id)!);
+						await session.setModel(runtime.getModel(providers[1], originalModel.id)!);
 					}
 					await session.prompt("안녕");
 					await session.waitForIdle();
@@ -178,13 +175,9 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 							modelApiCalls: 0,
 						}),
 					);
-					const expectedCalls = scenario.startsWith("abort")
-						? 1
-						: scenario === "all-exhausted"
-							? 3
-							: 2;
+					const expectedCalls = scenario.startsWith("abort") ? 1 : 2;
 					const expectedNotices =
-						scenario.endsWith("usage-limit") ? 1 : scenario === "all-exhausted" ? 2 : 0;
+						scenario.endsWith("usage-limit") || scenario === "all-exhausted" ? 1 : 0;
 					assert.equal(calls.length, expectedCalls);
 					assert.equal(notices.length, expectedNotices);
 					assert.equal(

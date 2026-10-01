@@ -2,33 +2,17 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { isRetryableAssistantError } from "@earendil-works/pi-ai/compat";
+import type { Api, Model, ProviderRequestOptions } from "@earendil-works/pi-ai";
 import {
 	ModelRuntime,
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { withFileLock } from "./lock.ts";
-import { accountToKeep, modelForAccount } from "./model.ts";
-import { exhaustedResetAt, isAccountAvailable, type Window } from "./quota.ts";
+import { accountToKeep, isAccountProvider, modelForAccount } from "./model.ts";
 
-type Credential = {
-	type?: string;
-	access?: string;
-	refresh?: string;
-	expires?: number;
-	accountId?: string;
-};
-type UsageBody = {
-	plan_type?: string;
-	rate_limit?: {
-		allowed?: boolean;
-		primary_window?: Window;
-		secondary_window?: Window;
-	};
-};
-type Account = Awaited<ReturnType<typeof fetchAccount>>;
+type Credential = { type?: string; access?: string };
 type TokenUsage = {
-	resetAt?: number;
 	input: number;
 	output: number;
 	cacheRead: number;
@@ -37,112 +21,34 @@ type TokenUsage = {
 	seen: string[];
 };
 type TokenUsageState = Record<string, TokenUsage>;
-type LegacyOAuthCallbacks = {
-	onAuth(info: { url: string; instructions?: string }): void;
-	onDeviceCode(info: {
-		userCode: string;
-		verificationUri: string;
-		intervalSeconds?: number;
-		expiresInSeconds?: number;
-	}): void;
-	onPrompt(prompt: { message: string; placeholder?: string }): Promise<string>;
-	onProgress?(message: string): void;
-	onManualCodeInput?(): Promise<string>;
-	onSelect(prompt: {
-		message: string;
-		options: Array<{ id: string; label: string }>;
-	}): Promise<string | undefined>;
-	signal?: AbortSignal;
-};
-
-async function createCodexConfig() {
-	const runtime = await ModelRuntime.create();
-	const modern = runtime.getProvider("openai-codex")?.auth.oauth;
-	if (!modern) throw new Error("OpenAI Codex OAuth provider unavailable");
-	return {
-		oauth: {
-			name: modern.name,
-			async login(callbacks: LegacyOAuthCallbacks) {
-				return modern.login({
-					signal: callbacks.signal ?? new AbortController().signal,
-					async prompt(prompt) {
-						if (prompt.type === "select") {
-							const selected = await callbacks.onSelect({
-								message: prompt.message,
-								options: prompt.options.map(({ id, label }) => ({ id, label })),
-							});
-							if (!selected) throw new Error("Login cancelled");
-							return selected;
-						}
-						if (prompt.type === "manual_code" && callbacks.onManualCodeInput)
-							return callbacks.onManualCodeInput();
-						return callbacks.onPrompt({
-							message: prompt.message,
-							placeholder: prompt.placeholder,
-						});
-					},
-					notify(event) {
-						if (event.type === "auth_url") callbacks.onAuth(event);
-						else if (event.type === "device_code") callbacks.onDeviceCode(event);
-						else callbacks.onProgress?.(event.message);
-					},
-				});
-			},
-			async refreshToken(credentials: Credential, signal?: AbortSignal) {
-				return modern.refresh(
-					{
-						...credentials,
-						type: "oauth",
-						access: credentials.access ?? "",
-						refresh: credentials.refresh ?? "",
-						expires: credentials.expires ?? 0,
-					},
-					signal ?? new AbortController().signal,
-				);
-			},
-			getApiKey(credentials: Credential) {
-				return credentials.access ?? "";
-			},
-		},
-		models: runtime.getModels("openai-codex").map(aliasModel),
-	};
-}
-
 const authPath = path.join(os.homedir(), ".pi", "agent", "auth.json");
-const tokenUsagePath = path.join(
-	os.homedir(),
-	".pi",
-	"agent",
-	"codex-account-usage.json",
-);
-const usageUrl = "https://chatgpt.com/backend-api/wham/usage";
+// Keep the existing file so recorded usage is not lost during the migration.
+const tokenUsagePath = path.join(os.homedir(), ".pi", "agent", "codex-account-usage.json");
 const cooldowns = new Map<string, number>();
 const limitPattern =
 	/429|rate[_ ]?limit|too many requests|usage[_ ]?limit|usage_not_included|quota|out of budget|available balance|billing hard limit|freeusagelimiterror|gousagelimiterror/i;
 
-function isCodexProvider(provider: string): boolean {
-	return (
-		provider === "openai-codex" || /^openai-codex-account-\d+$/.test(provider)
-	);
-}
-
 function accountNumber(provider: string): number {
-	return Number(provider.match(/-account-(\d+)$/)?.[1] ?? 1);
+	return provider === "openai" ? 1 : 2;
 }
 
 async function readAccounts(): Promise<[string, Credential][]> {
-	const content = await fs.readFile(authPath, "utf8");
+	let content: string;
+	try {
+		content = await fs.readFile(authPath, "utf8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+		throw error;
+	}
 	let auth: Record<string, Credential>;
 	try {
-		auth = JSON.parse(content) as Record<string, Credential>;
+		auth = JSON.parse(content);
 	} catch {
 		throw new Error(`${authPath} 파일이 올바른 JSON이 아닙니다.`);
 	}
 	return Object.entries(auth)
-		.filter(
-			([provider, credential]) =>
-				isCodexProvider(provider) && credential.type === "oauth",
-		)
+		.filter(([provider, credential]) =>
+			isAccountProvider(provider) && credential?.type === "oauth" && Boolean(credential.access))
 		.sort(([a], [b]) => accountNumber(a) - accountNumber(b));
 }
 
@@ -150,82 +56,15 @@ function emailFromToken(token = ""): string {
 	try {
 		const [, payloadPart] = token.split(".");
 		const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString());
-		return (
-			payload["https://api.openai.com/profile"]?.email ??
-			payload.email ??
-			"이메일 없음"
-		);
+		return payload["https://api.openai.com/profile"]?.email ?? payload.email ?? "이메일 없음";
 	} catch {
 		return "이메일 확인 불가";
 	}
 }
 
-function remaining(window?: Window): number | undefined {
-	return typeof window?.used_percent === "number"
-		? Math.max(0, Math.round(100 - window.used_percent))
-		: undefined;
-}
-
-function resetAt(window?: Window): number | undefined {
-	if (!window?.reset_at) return undefined;
-	return window.reset_at < 10_000_000_000
-		? window.reset_at * 1000
-		: window.reset_at;
-}
-
-function resetIn(window?: Window): string {
-	const reset = resetAt(window);
-	if (!reset) return "?";
-	const minutes = Math.max(0, Math.ceil((reset - Date.now()) / 60_000));
-	if (minutes < 60) return `${minutes}분`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}시간 ${minutes % 60}분`;
-	return `${Math.floor(hours / 24)}일 ${hours % 24}시간`;
-}
-
-function formatResetDate(window?: Window): string {
-	const ts = resetAt(window);
-	if (!ts) return "?";
-	const d = new Date(ts);
-	const m = d.getMonth() + 1;
-	const day = d.getDate();
-	const hh = String(d.getHours()).padStart(2, "0");
-	const mm = String(d.getMinutes()).padStart(2, "0");
-	return `${m}/${day} ${hh}:${mm}`;
-}
-
-function bar(value?: number): string {
-	if (value === undefined) return "----------";
-	const filled = Math.round(value / 10);
-	return `${"█".repeat(filled)}${"░".repeat(10 - filled)}`;
-}
-
-function windowLabel(window: Window | undefined, fallback: string): string {
-	const seconds = window?.limit_window_seconds;
-	if (!seconds) return fallback;
-	if (seconds % 604_800 === 0) return `${seconds / 604_800}주`;
-	if (seconds % 86_400 === 0) return `${seconds / 86_400}일`;
-	if (seconds % 3_600 === 0) return `${seconds / 3_600}시간`;
-	return fallback;
-}
-
-function emptyTokenUsage(reset?: number): TokenUsage {
-	return {
-		resetAt: reset,
-		input: 0,
-		output: 0,
-		cacheRead: 0,
-		cacheWrite: 0,
-		total: 0,
-		seen: [],
-	};
-}
-
 async function readTokenUsage(): Promise<TokenUsageState> {
 	try {
-		return JSON.parse(
-			await fs.readFile(tokenUsagePath, "utf8"),
-		) as TokenUsageState;
+		return JSON.parse(await fs.readFile(tokenUsagePath, "utf8"));
 	} catch {
 		return {};
 	}
@@ -233,9 +72,7 @@ async function readTokenUsage(): Promise<TokenUsageState> {
 
 async function writeTokenUsage(state: TokenUsageState): Promise<void> {
 	const temporary = `${tokenUsagePath}.tmp`;
-	await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, {
-		mode: 0o600,
-	});
+	await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
 	await fs.rename(temporary, tokenUsagePath);
 }
 
@@ -245,112 +82,8 @@ function formatTokens(tokens: number): string {
 	return String(tokens);
 }
 
-async function fetchAccount(provider: string, credential: Credential) {
-	const email = emailFromToken(credential.access);
-	if (!credential.access) return { provider, email, error: "OAuth 토큰 없음" };
-	try {
-		const headers: Record<string, string> = {
-			Authorization: `Bearer ${credential.access}`,
-			Accept: "application/json",
-		};
-		if (credential.accountId)
-			headers["ChatGPT-Account-Id"] = credential.accountId;
-		const response = await fetch(usageUrl, {
-			headers,
-			signal: AbortSignal.timeout(10_000),
-		});
-		if (!response.ok)
-			return { provider, email, error: `HTTP ${response.status}` };
-		const body = (await response.json()) as UsageBody;
-		return {
-			provider,
-			email,
-			plan: body.plan_type,
-			allowed: body.rate_limit?.allowed,
-			primary: body.rate_limit?.primary_window,
-			secondary: body.rate_limit?.secondary_window,
-		};
-	} catch (error) {
-		return {
-			provider,
-			email,
-			error: error instanceof Error ? error.message : String(error),
-		};
-	}
-}
-
-function row(
-	account: Account,
-	current: string | undefined,
-	_usage: TokenUsage | undefined,
-): string {
-	const n = accountNumber(account.provider);
-	const isCurrent = account.provider === current;
-	const marker = isCurrent ? "●" : "○";
-	if (account.error)
-		return `${marker} ${n}번  ${account.email}  조회 실패: ${account.error}`;
-	const pRem = remaining(account.primary);
-	const sRem = remaining(account.secondary);
-	const pTxt = pRem === undefined ? "?" : `${pRem}%`;
-	const sTxt = sRem === undefined ? "?" : `${sRem}%`;
-	const cur = isCurrent ? "  ← 현재" : "";
-	// 5h:32% 형태로 콜론으로 구분해 겹쳐 보이는 문제 해결
-	return `${marker} ${n}번  ${account.email}  5h:${pTxt} · 7d:${sTxt}${cur}`;
-}
-
-function detailRow(
-	account: Account,
-	usage: TokenUsage | undefined,
-	current?: string,
-): string {
-	const isCurrent = account.provider === current;
-	const marker = isCurrent ? "●" : "○";
-	const curTag = isCurrent ? "  ← 현재 사용 중" : "";
-	if (account.error)
-		return `  ${marker} ${accountNumber(account.provider)}번  ${account.email}  오류: ${account.error}${curTag}`;
-	const n = String(accountNumber(account.provider)).padStart(2, " ");
-	const pLabel = windowLabel(account.primary, "5h");
-	const sLabel = windowLabel(account.secondary, "7d");
-	const pRem = remaining(account.primary);
-	const sRem = remaining(account.secondary);
-	const pPct =
-		pRem === undefined ? "?" : `${String(pRem).padStart(3, " ")}% 남음`;
-	const sPct =
-		sRem === undefined ? "?" : `${String(sRem).padStart(3, " ")}% 남음`;
-	const tokens = usage
-		? `토큰 ${formatTokens(usage.total)} (캐시 ${formatTokens(usage.cacheRead)})`
-		: "토큰 0";
-	const pBar = `${bar(pRem)} [${pPct}]`;
-	const sBar = `${bar(sRem)} [${sPct}]`;
-	return [
-		` ${marker}${n}번  ${account.email}  [${account.plan ?? "?"}]  ${tokens}${curTag}`,
-		`     └ ${pLabel} ${pBar}  리셋 ${formatResetDate(account.primary)} (${resetIn(account.primary)} 후)  ·  ${sLabel} ${sBar}  리셋 ${formatResetDate(account.secondary)} (${resetIn(account.secondary)} 후)`,
-	].join("\n");
-}
-
-function buildTable(
-	accounts: Account[],
-	tokenUsage: TokenUsageState,
-	current?: string,
-): string {
-	const header = " Codex 계정별 남은 한도 (5시간 · 7일)";
-	const lines = accounts.map((a) =>
-		detailRow(a, tokenUsage[a.provider], current),
-	);
-	let curLine = "";
-	if (current) {
-		if (isCodexProvider(current)) {
-			const curAcc = accounts.find((a) => a.provider === current);
-			curLine = curAcc
-				? ` │ 현재: ${curAcc.email} (${accountNumber(current)}번) ●`
-				: ` │ 현재: ${current}`;
-		} else {
-			curLine = ` │ 현재 모델: ${current} (Codex 아님)`;
-		}
-	} else {
-		curLine = " │ 현재 모델 없음";
-	}
-	return [header + curLine, "─".repeat(72), ...lines].join("\n");
+function accountRow(provider: string, credential: Credential, current?: string): string {
+	return `${provider === current ? "●" : "○"} ${accountNumber(provider)}번  ${emailFromToken(credential.access)}${provider === current ? "  ← 현재" : ""}`;
 }
 
 function retryCountSinceLastUser(ctx: ExtensionContext): number {
@@ -362,72 +95,56 @@ function retryCountSinceLastUser(ctx: ExtensionContext): number {
 		}
 		if (entry.type !== "message") continue;
 		if (entry.message.role === "user") retries = 0;
-		else if (
-			entry.message.role === "custom" &&
-			entry.message.customType === "codex-account-retry"
-		) retries++;
+		else if (entry.message.role === "custom" && entry.message.customType === "codex-account-retry") retries++;
 	}
 	return retries;
 }
 
-function aliasModel(model: ReturnType<ModelRuntime["getModels"]>[number]) {
-	return {
-		id: model.id,
-		name: model.name,
-		api: model.api,
-		reasoning: model.reasoning,
-		thinkingLevelMap: model.thinkingLevelMap,
-		input: model.input,
-		cost: model.cost,
-		contextWindow: model.contextWindow,
-		maxTokens: model.maxTokens,
-		compat: model.compat,
-	};
-}
-
-async function switchTo(
-	provider: string,
-	ctx: ExtensionContext,
-	pi: ExtensionAPI,
-): Promise<boolean> {
+async function switchTo(provider: string, ctx: ExtensionContext, pi: ExtensionAPI): Promise<boolean> {
 	if (ctx.model?.provider === provider) return true;
-	const preferredId = ctx.model?.id;
 	const target = modelForAccount(
 		provider,
 		ctx.model,
-		preferredId ? ctx.modelRegistry.find(provider, preferredId) : undefined,
-		ctx.modelRegistry.find(provider, "gpt-6-sol"),
+		ctx.model ? ctx.modelRegistry.find(provider, ctx.model.id) : undefined,
+		ctx.modelRegistry.find(provider, "gpt-6.1-sol"),
 	);
 	if (!target) {
-		ctx.ui.notify(`${provider}에서 사용할 Codex 모델을 찾지 못했습니다.`, "error");
+		ctx.ui.notify(`${provider}에서 사용할 ChatGPT 모델을 찾지 못했습니다.`, "error");
 		return false;
 	}
 	return pi.setModel(target);
 }
 
-export default async function codexAccounts(pi: ExtensionAPI) {
-	const { oauth: codexOAuth, models } = await createCodexConfig();
-	const accounts = await readAccounts().catch(() => []);
-	const highest = Math.max(
-		1,
-		...accounts.map(([provider]) => accountNumber(provider)),
-	);
-	const providers = new Set(accounts.map(([provider]) => provider));
-	providers.add(`openai-codex-account-${highest + 1}`);
+// Pi 0.99.2 detects subscription requests only for the literal "openai" provider.
+// Apply the same exclusions to aliases without changing message/account identity.
+function subscriptionOptions<T extends ProviderRequestOptions>(options?: T) {
+	return {
+		...options,
+		onPayload: async (payload: unknown, model: Model<Api>) => {
+			const request = { ...((await options?.onPayload?.(payload, model)) ?? payload) as Record<string, unknown> };
+			for (const field of ["max_output_tokens", "temperature", "prompt_cache_retention", "prompt_cache_options"])
+				delete request[field];
+			return request;
+		},
+	};
+}
 
-	for (const provider of providers) {
-		if (provider === "openai-codex") continue;
-		pi.registerProvider(provider, {
-			name: `ChatGPT Plus/Pro (Codex ${provider})`,
-			baseUrl: "https://chatgpt.com/backend-api",
-			api: "openai-codex-responses",
-			oauth: {
-				...codexOAuth,
-				name: `ChatGPT Plus/Pro (Codex ${provider})`,
-			},
-			models,
-		});
-	}
+export default async function codexAccounts(pi: ExtensionAPI) {
+	const runtime = await ModelRuntime.create();
+	const official = runtime.getProvider("openai");
+	if (!official?.auth.oauth) throw new Error("OpenAI ChatGPT OAuth provider unavailable (Pi 0.99.2 이상 필요)");
+	const id = "openai-account-2";
+	// Native OAuth owns deviceId, issued clientId/scopes, refresh and API routing.
+	pi.registerProvider({
+		...official,
+		id,
+		name: "OpenAI (ChatGPT 2번 계정)",
+		auth: { oauth: official.auth.oauth },
+		getModels: () => official.getModels().map((m) => ({ ...m, provider: id })),
+		getAllModels: () => (official.getAllModels?.() ?? official.getModels()).map((m) => ({ ...m, provider: id })),
+		stream: (model, context, options) => official.stream<Api>(model, context, subscriptionOptions(options)),
+		streamSimple: (model, context, options) => official.streamSimple(model, context, subscriptionOptions(options)),
+	});
 
 	let switchingAccount = false;
 	async function switchAccount(provider: string, ctx: ExtensionContext) {
@@ -439,85 +156,52 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 		}
 	}
 
-	pi.registerCommand("codex-accounts", {
-		description: "Codex 계정별 한도를 보고 선택한 계정으로 전환",
-		handler: async (_args, ctx) => {
-			for (;;) {
-				const entries = await readAccounts();
-				const loaded = await Promise.all(
-					entries.map(([provider, credential]) =>
-						fetchAccount(provider, credential),
-					),
-				);
-				const tokenUsage = await readTokenUsage();
-				let usageChanged = false;
-				for (const account of loaded) {
-					if (account.error) continue;
-					const reset = resetAt(account.primary);
-					const saved = tokenUsage[account.provider];
-					if (!saved) {
-						tokenUsage[account.provider] = emptyTokenUsage(reset);
-						usageChanged = true;
-					} else if (reset && saved.resetAt && saved.resetAt !== reset) {
-						tokenUsage[account.provider] = emptyTokenUsage(reset);
-						usageChanged = true;
-					} else if (reset && !saved.resetAt) {
-						saved.resetAt = reset;
-						usageChanged = true;
+	const accountCommand = {
+		description: "ChatGPT 구독 계정 2개를 확인하고 전환",
+		handler: async (_args: string, ctx: ExtensionContext) => {
+			try {
+				for (;;) {
+					const entries = await readAccounts();
+					if (!entries.length) {
+						ctx.ui.notify("/login openai와 /login openai-account-2에서 ChatGPT로 로그인하세요.", "info");
+						return;
+					}
+					const usage = await readTokenUsage();
+					const rows = entries.map(([provider, credential]) => accountRow(provider, credential, ctx.model?.provider));
+					const lines = entries.flatMap(([provider], i) => {
+						const wait = Math.max(0, Math.ceil(((cooldowns.get(provider) ?? 0) - Date.now()) / 60_000));
+						return [
+							` ${rows[i]}  누적 토큰 ${formatTokens(usage[provider]?.total ?? 0)}`,
+							`     └ 구독 잔여 한도 조회 미지원${wait ? `  자동 전환 대기 ${wait}분` : ""}`,
+						];
+					});
+					ctx.ui.setWidget("codex-accounts-table", [
+						` ChatGPT 구독 계정 │ 현재: ${ctx.model?.provider ?? "모델 없음"}`,
+						...lines,
+					], { placement: "aboveEditor" });
+					const refresh = "새로고침", close = "닫기";
+					const choice = await ctx.ui.select("전환할 계정 선택 (상세는 위 표 참고)", [...rows, refresh, close]);
+					if (!choice || choice === close) return;
+					if (choice === refresh) continue;
+					const selected = entries[rows.indexOf(choice)];
+					if (!selected || selected[0] === ctx.model?.provider) return;
+					if (await switchAccount(selected[0], ctx)) {
+						ctx.ui.notify(`${accountNumber(selected[0])}번 계정으로 전환했습니다. 모델: ${ctx.model?.id}`, "info");
+						return;
 					}
 				}
-				if (usageChanged) await writeTokenUsage(tokenUsage);
-				// 상세 표는 위젯으로 띄워 명령어 닫히면 자동 사라지게 함
-				const table = buildTable(loaded, tokenUsage, ctx.model?.provider);
-				ctx.ui.setWidget("codex-accounts-table", table.split("\n"), {
-					placement: "aboveEditor",
-				});
-				const rows = loaded.map((account) =>
-					row(account, ctx.model?.provider, tokenUsage[account.provider]),
-				);
-				const refresh = "↻ 새로고침";
-				const close = "닫기";
-				const choice = await ctx.ui.select("전환할 계정 선택 (상세는 위 표 참고)", [
-					...rows,
-					refresh,
-					close,
-				]);
-				if (!choice || choice === close) {
-					ctx.ui.setWidget("codex-accounts-table", undefined);
-					return;
-				}
-				if (choice === refresh) continue;
-				const selected = loaded[rows.indexOf(choice)];
-				if (!selected || selected.provider === ctx.model?.provider) {
-					ctx.ui.setWidget("codex-accounts-table", undefined);
-					return;
-				}
-				if (await switchAccount(selected.provider, ctx)) {
-					ctx.ui.setWidget("codex-accounts-table", undefined);
-					ctx.ui.notify(`${selected.email} 계정으로 전환했습니다. 모델: ${ctx.model?.id}`, "info");
-					return;
-				}
+			} finally {
 				ctx.ui.setWidget("codex-accounts-table", undefined);
 			}
 		},
-	});
+	};
+	pi.registerCommand("openai-accounts", accountCommand);
+	pi.registerCommand("codex-accounts", accountCommand); // Preserve the familiar command, not legacy authentication.
 
-	// /model은 공유 별칭 openai-codex의 모델만 노출한다. 계정 별칭을 쓰는 중에
-	// 모델만 바꾸면 provider가 공유 별칭으로 바뀌며 계정이 1번으로 되돌아간다.
-	// 이때 고른 모델 ID는 그대로 두고 현재 계정만 유지한다.
 	pi.on("model_select", async (event) => {
-		// 명시적인 계정 전환(수동/자동)은 /model의 계정 유지 대상이 아니다.
 		if (switchingAccount) return;
-		const keep = accountToKeep(
-			event.previousModel?.provider,
-			event.model.provider,
-		);
-		if (!keep) return;
-		const target = {
-			...event.model,
-			provider: keep,
-		};
-		await pi.setModel(target);
+		const keep = accountToKeep(event.previousModel?.provider, event.model.provider);
+		if (keep) await pi.setModel({ ...event.model, provider: keep });
 	});
 
 	let usageWrite = Promise.resolve();
@@ -544,37 +228,24 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 
 	pi.on("agent_settled", (_event, ctx) => {
 		const retry = pendingRetry;
-		pendingRetry = undefined; // Consume before sending: at most once per failed response.
+		pendingRetry = undefined;
 		if (
-			!retry ||
-			retry.revision !== revision ||
-			retry.signal?.aborted ||
-			!ctx.isIdle() ||
-			ctx.hasPendingMessages() ||
-			ctx.model !== retry.model ||
+			!retry || retry.revision !== revision || retry.signal?.aborted ||
+			!ctx.isIdle() || ctx.hasPendingMessages() || ctx.model !== retry.model ||
 			ctx.sessionManager.getSessionId() !== retry.sessionId
-		)
-			return;
-		const branch = ctx.sessionManager.getBranch();
-		const leaf = branch.at(-1);
+		) return;
+		const leaf = ctx.sessionManager.getBranch().at(-1);
 		if (
-			retryCountSinceLastUser(ctx) >= retry.maxRetries ||
-			leaf?.type !== "message" ||
-			leaf.message !== retry.message ||
-			leaf.message.role !== "assistant" ||
+			retryCountSinceLastUser(ctx) >= retry.maxRetries || leaf?.type !== "message" ||
+			leaf.message !== retry.message || leaf.message.role !== "assistant" ||
 			leaf.message.stopReason !== "error"
-		)
-			return;
-		pi.sendMessage(
-			{
-				customType: "codex-account-retry",
-				display: true,
-				details: { failedMessageId: leaf.id },
-				content:
-					"계정 전환이 완료됐습니다. 바로 앞 한도 오류로 중단된 현재 응답만 이어가세요. 이미 완료한 일이나 과거 대화의 작업을 다시 시작하지 마세요.",
-			},
-			{ triggerTurn: true },
-		);
+		) return;
+		pi.sendMessage({
+			customType: "codex-account-retry",
+			display: true,
+			details: { failedMessageId: leaf.id },
+			content: "계정 전환이 완료됐습니다. 바로 앞 한도 오류로 중단된 현재 응답만 이어가세요. 이미 완료한 일이나 과거 대화의 작업을 다시 시작하지 마세요.",
+		}, { triggerTurn: true });
 	});
 
 	pi.on("message_end", async (event, ctx) => {
@@ -585,111 +256,63 @@ export default async function codexAccounts(pi: ExtensionAPI) {
 		const failedSignal = ctx.signal;
 		const failedRevision = revision;
 		const stillCurrent = () =>
-			revision === failedRevision &&
-			!failedSignal?.aborted &&
+			revision === failedRevision && !failedSignal?.aborted &&
 			ctx.sessionManager.getSessionId() === failedSessionId &&
-			ctx.sessionManager.getLeafId() === failedLeafId &&
-			ctx.model === failedModel &&
+			ctx.sessionManager.getLeafId() === failedLeafId && ctx.model === failedModel &&
 			!ctx.hasPendingMessages();
-		if (
-			isCodexProvider(event.message.provider) &&
-			event.message.usage.totalTokens > 0
-		) {
+		if (isAccountProvider(event.message.provider) && event.message.usage.totalTokens > 0) {
 			const message = event.message;
-			// 여러 pi 프로세스가 같은 파일을 갱신하므로 read→write 전체를 프로세스 간 잠금으로 감싼다.
-			// 한 번 실패해도 체인이 영구 거부 상태로 남지 않게 catch로 마무리한다.
-			usageWrite = usageWrite
-				.then(() =>
-					withFileLock(tokenUsagePath, async () => {
-						const state = await readTokenUsage();
-						let usage = state[message.provider] ?? emptyTokenUsage();
-						if (usage.resetAt && message.timestamp >= usage.resetAt)
-							usage = emptyTokenUsage();
-						const fingerprint = `${message.provider}:${message.timestamp}:${message.model}:${message.usage.totalTokens}`;
-						if (usage.seen.includes(fingerprint)) return;
-						usage.input += message.usage.input;
-						usage.output += message.usage.output;
-						usage.cacheRead += message.usage.cacheRead;
-						usage.cacheWrite += message.usage.cacheWrite;
-						usage.total += message.usage.totalTokens;
-						usage.seen = [...usage.seen.slice(-999), fingerprint];
-						state[message.provider] = usage;
-						await writeTokenUsage(state);
-					}),
-				)
-				.catch(() => {});
+			usageWrite = usageWrite.then(() => withFileLock(tokenUsagePath, async () => {
+				const state = await readTokenUsage();
+				const usage = state[message.provider] ?? {
+					input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, seen: [],
+				};
+				const fingerprint = `${message.provider}:${message.timestamp}:${message.model}:${message.usage.totalTokens}`;
+				if (usage.seen.includes(fingerprint)) return;
+				usage.input += message.usage.input;
+				usage.output += message.usage.output;
+				usage.cacheRead += message.usage.cacheRead;
+				usage.cacheWrite += message.usage.cacheWrite;
+				usage.total += message.usage.totalTokens;
+				usage.seen = [...usage.seen.slice(-999), fingerprint];
+				state[message.provider] = usage;
+				await writeTokenUsage(state);
+			})).catch(() => {
+				ctx.ui.notify("계정 사용량 기록에 실패했습니다. 누적 토큰 표시가 실제 사용량보다 적을 수 있습니다.", "warning");
+			});
 			await usageWrite;
 		}
 		if (event.message.stopReason !== "error") return;
-		const error = event.message.errorMessage ?? "";
 		const current = ctx.model?.provider;
 		if (
-			!current ||
-			event.message.provider !== current ||
-			!isCodexProvider(current) ||
-			!limitPattern.test(error) ||
-			!stillCurrent()
-		)
-			return;
+			!current || event.message.provider !== current || !isAccountProvider(current) ||
+			!limitPattern.test(event.message.errorMessage ?? "") || !stillCurrent()
+		) return;
 		const entries = await readAccounts();
-		if (
-			!isRetryableAssistantError(event.message) &&
-			retryCountSinceLastUser(ctx) >= Math.max(0, entries.length - 1)
-		) {
-			ctx.ui.notify("이 요청의 Codex 자동 재개 횟수를 모두 사용했습니다. 직접 다시 요청하세요.", "error");
+		const maxRetries = Math.max(0, entries.length - 1);
+		if (!isRetryableAssistantError(event.message) && retryCountSinceLastUser(ctx) >= maxRetries) {
+			ctx.ui.notify("이 요청의 ChatGPT 자동 재개 횟수를 모두 사용했습니다. 직접 다시 요청하세요.", "error");
 			return;
 		}
-		const currentUsage = await fetchAccount(
-			current,
-			Object.fromEntries(entries)[current] ?? {},
-		);
-		const reset =
-			"primary" in currentUsage
-				? exhaustedResetAt(currentUsage.primary, currentUsage.secondary)
-				: undefined;
-		cooldowns.set(
-			current,
-			reset && reset > Date.now() ? reset : Date.now() + 60 * 60 * 1000,
-		);
-		const candidates = await Promise.all(
-			entries.map(async ([provider, credential]) => ({
-				provider,
-				credential,
-				usage: await fetchAccount(provider, credential),
-			})),
-		);
-		const next = candidates.find(
-			({ provider, usage }) =>
-				provider !== current &&
-				(cooldowns.get(provider) ?? 0) <= Date.now() &&
-				isAccountAvailable(usage),
-		);
+		// ponytail: reset time is unknown; use a process-local 1h cooldown until a supported quota API exists.
+		cooldowns.set(current, Date.now() + 60 * 60 * 1000);
+		const next = entries.find(([provider]) =>
+			provider !== current && (cooldowns.get(provider) ?? 0) <= Date.now());
 		if (!next) {
-			ctx.ui.notify("모든 Codex 계정이 한도 소진 또는 대기 상태입니다.", "error");
+			ctx.ui.notify("모든 ChatGPT 계정이 한도 오류 또는 대기 상태입니다.", "error");
 			return;
 		}
-		if (!stillCurrent()) return;
-		if (!(await switchAccount(next.provider, ctx))) return;
+		if (!stillCurrent() || !(await switchAccount(next[0], ctx))) return;
 		if (
-			!isRetryableAssistantError(event.message) &&
-			revision === failedRevision &&
-			!failedSignal?.aborted &&
-			ctx.sessionManager.getSessionId() === failedSessionId &&
+			!isRetryableAssistantError(event.message) && revision === failedRevision &&
+			!failedSignal?.aborted && ctx.sessionManager.getSessionId() === failedSessionId &&
 			!ctx.hasPendingMessages()
 		) {
-			// Never compete with native retries, including a cancelled retry backoff.
 			pendingRetry = {
-				message: event.message,
-				sessionId: failedSessionId,
-				model: ctx.model,
-				signal: failedSignal,
-				revision,
-				maxRetries: Math.max(0, entries.length - 1),
+				message: event.message, sessionId: failedSessionId, model: ctx.model,
+				signal: failedSignal, revision, maxRetries,
 			};
 		}
-		ctx.ui.notify(
-			`${emailFromToken(next.credential.access)} 계정으로 전환했습니다. 같은 오류로 멈춰 있으면 현재 응답만 자동으로 이어갑니다.`,
-			"warning",
-		);
+		ctx.ui.notify(`${accountNumber(next[0])}번 계정으로 전환했습니다. 같은 오류로 멈춰 있으면 현재 응답만 자동으로 이어갑니다.`, "warning");
 	});
 }
