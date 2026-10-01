@@ -1,7 +1,7 @@
 {
   "name": "pi-custom-packages",
   "version": "0.1.0",
-  "description": "Eight packages for the pi coding agent: session guards, Herdr and remote-pi integration, Windows/WSL tools, and Codex account rotation.",
+  "description": "Eight packages for the pi coding agent: session guards, Herdr and remote-pi integration, Windows/WSL tools, and ChatGPT subscription account switching.",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -25,7 +25,7 @@
   "pi": {
     "extensions": [
       "./packages/pi-bash-watchdog/extensions/bash-watchdog/index.ts",
-      "./packages/pi-codex-accounts/extensions/codex-accounts/index.ts",
+      "./packages/pi-openai-accounts/extensions/openai-accounts/index.ts",
       "./packages/pi-gpt-img/extensions/gpt-img/index.ts",
       "./packages/pi-herdr-ask-blocked/extensions/herdr-ask-blocked/index.ts",
       "./packages/pi-remote-pi-space-name/extensions/remote-pi-space-name/index.ts",

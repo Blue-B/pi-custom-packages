@@ -129,7 +129,7 @@ function subscriptionOptions<T extends ProviderRequestOptions>(options?: T) {
 	};
 }
 
-export default async function codexAccounts(pi: ExtensionAPI) {
+export default async function openaiAccounts(pi: ExtensionAPI) {
 	const runtime = await ModelRuntime.create();
 	const official = runtime.getProvider("openai");
 	if (!official?.auth.oauth) throw new Error("OpenAI ChatGPT OAuth provider unavailable (Pi 0.99.2 이상 필요)");

@@ -60,8 +60,8 @@ test("only the settled current failure resumes, without replaying a user request
 				noThemes: true,
 				noContextFiles: true,
 				additionalExtensionPaths: [
-					path.resolve(
-						"packages/pi-codex-accounts/extensions/codex-accounts/index.ts",
+					process.env.OPENAI_ACCOUNTS_ENTRY ?? process.env.CODEX_ACCOUNTS_ENTRY ?? path.resolve(
+						"packages/pi-openai-accounts/extensions/openai-accounts/index.ts",
 					),
 				],
 			});

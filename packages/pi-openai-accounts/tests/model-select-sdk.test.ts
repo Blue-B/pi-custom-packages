@@ -25,8 +25,8 @@ test("/model preserves the official account and commands explicitly switch it", 
 		const settings = SettingsManager.inMemory({ compaction: { enabled: false } });
 		const loader = new DefaultResourceLoader({
 			cwd: home, agentDir, settingsManager: settings,
-			additionalExtensionPaths: [process.env.CODEX_ACCOUNTS_ENTRY ??
-				path.resolve("packages/pi-codex-accounts/extensions/codex-accounts/index.ts")],
+			additionalExtensionPaths: [process.env.OPENAI_ACCOUNTS_ENTRY ?? process.env.CODEX_ACCOUNTS_ENTRY ??
+				path.resolve("packages/pi-openai-accounts/extensions/openai-accounts/index.ts")],
 			noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true,
 			noContextFiles: true, systemPrompt: "Respond OK.", appendSystemPrompt: [],
 		});

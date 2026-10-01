@@ -1,13 +1,15 @@
-# pi-codex-accounts
+# pi-openai-accounts
 
-ChatGPT 구독 OAuth 계정 2개를 전환하는 Pi 확장입니다. 패키지 이름과 `/codex-accounts` 명령은 유지하지만, 기존 Codex 인증과 한도 조회는 사용하지 않습니다. Pi 0.99.2 이상이 필요합니다.
+ChatGPT 구독 OAuth 계정 2개를 전환하는 Pi 확장입니다. 기존 Codex 인증과 한도 조회는 사용하지 않습니다. Pi 0.99.2 이상이 필요합니다.
+
+이전 이름은 `pi-codex-accounts`입니다. 기존 로컬 설치는 Pi 설정의 패키지 경로를 `packages/pi-openai-accounts`로 바꾼 뒤 `/reload`하세요. `/codex-accounts` 명령은 호환 별칭으로 유지합니다.
 
 ## 설치와 로그인
 
 ```bash
 git clone https://github.com/Blue-B/pi-custom-packages.git
 cd pi-custom-packages
-pi install ./packages/pi-codex-accounts
+pi install ./packages/pi-openai-accounts
 ```
 
 Pi에서 `/reload` 후 다음 두 계정에 로그인합니다.
@@ -46,12 +48,12 @@ Pi에서 `/reload` 후 다음 두 계정에 로그인합니다.
 저장소 루트에서 실행합니다.
 
 ```bash
-tsx --test packages/pi-codex-accounts/tests/*.test.ts
+tsx --test packages/pi-openai-accounts/tests/*.test.ts
 ```
 
 임시 홈과 가짜 인증, 모델 응답으로 실제 Pi 로더와 세션을 검사합니다. OAuth 로그인 정보 보존과 갱신, API 경로, 모델 정보, 명시적인 계정 전환, 기본 재시도와의 협력, 중복 재개 방지, 취소, 두 계정 소진을 검증합니다. 실제 구독 한도를 소비하지 않으며 큰 입력의 서버 허용 범위를 입증하는 검사는 아닙니다.
 
-설치본 검사는 `CODEX_ACCOUNTS_ENTRY=/절대경로/codex-accounts/index.ts`로 지정할 수 있습니다. 이 확장은 패키지로 설치하고 `~/.pi/agent/extensions/`에 같은 확장의 손 복사본을 두지 않습니다. 이미 열린 Pi에는 `/reload`가 필요합니다. 기존 Codex 모델로 저장된 세션은 새 계정과 모델을 직접 선택해야 합니다.
+설치본 검사는 `OPENAI_ACCOUNTS_ENTRY=/절대경로/openai-accounts/index.ts` (기존 `CODEX_ACCOUNTS_ENTRY`도 지원)로 지정할 수 있습니다. 이 확장은 패키지로 설치하고 `~/.pi/agent/extensions/`에 같은 확장의 손 복사본을 두지 않습니다. 이미 열린 Pi에는 `/reload`가 필요합니다. 기존 Codex 모델로 저장된 세션은 새 계정과 모델을 직접 선택해야 합니다.
 
 ## License
 

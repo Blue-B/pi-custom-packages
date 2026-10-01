@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { accountToKeep, isAccountProvider, modelForAccount } from "../extensions/codex-accounts/model.ts";
+import { accountToKeep, isAccountProvider, modelForAccount } from "../extensions/openai-accounts/model.ts";
 
 test("only the two official subscription accounts participate", () => {
 	assert.equal(isAccountProvider("openai"), true);

@@ -1,5 +1,5 @@
 {
-  "name": "pi-codex-accounts",
+  "name": "pi-openai-accounts",
   "version": "0.1.0",
   "description": "Two ChatGPT subscription accounts for pi: native OpenAI OAuth, account-preserving model selection, and bounded quota failover. Requires Pi 0.99.2 or newer.",
   "keywords": [
@@ -8,7 +8,6 @@
     "pi-coding-agent",
     "pi-extension",
     "extension",
-    "codex",
     "openai",
     "chatgpt",
     "multi-account",
@@ -27,7 +26,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
-    "directory": "packages/pi-codex-accounts"
+    "directory": "packages/pi-openai-accounts"
   },
   "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
   "bugs": {

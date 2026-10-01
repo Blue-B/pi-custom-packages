@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { withFileLock } from "../extensions/codex-accounts/lock.ts";
+import { withFileLock } from "../extensions/openai-accounts/lock.ts";
 
 test("concurrent read-modify-write under the lock loses no updates", async () => {
 	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "codex-lock-"));

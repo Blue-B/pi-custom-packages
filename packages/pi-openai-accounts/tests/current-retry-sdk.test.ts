@@ -33,8 +33,8 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 		),
 	);
 	const extension =
-		process.env.CODEX_ACCOUNTS_ENTRY ??
-		path.resolve("packages/pi-codex-accounts/extensions/codex-accounts/index.ts");
+		process.env.OPENAI_ACCOUNTS_ENTRY ?? process.env.CODEX_ACCOUNTS_ENTRY ??
+		path.resolve("packages/pi-openai-accounts/extensions/openai-accounts/index.ts");
 	let abortOnRead: (() => void) | undefined;
 	const readFile = fs.readFile.bind(fs);
 	mock.method(fs, "readFile", async (...args: any[]) => {
