@@ -63,6 +63,7 @@ console.log(JSON.stringify({success: true, data}));
 		let status = 200;
 		let modelRequests = 0;
 		let usageRequests = 0;
+		let validPlan = true;
 		mock.method(globalThis, "fetch", async (url: string, options: any) => {
 			usageRequests++;
 			assert.ok(url.startsWith("https://chatgpt.com/backend-api/wham/usage"));
@@ -71,7 +72,7 @@ console.log(JSON.stringify({success: true, data}));
 			if (url.endsWith("responses")) modelRequests++;
 			return new Response(JSON.stringify(url.endsWith("/apps")
 				? { items: [{ id: "oaiapp_one", windows: [{ used_percent: 1, limit_window_seconds: 604800 }] }] }
-				: { rate_limit: { primary_window: { used_percent: 74, limit_window_seconds: 604800 } } }), { status });
+				: { rate_limit: { primary_window: { ...(validPlan ? { used_percent: 74 } : {}), limit_window_seconds: 604800 } } }), { status });
 		});
 		const entries: [string, { clientId: string }][] = [["openai", { clientId: "oaiapp_one" }], ["openai-account-2", { clientId: "oaiapp_two" }]];
 		const usage = await readBrowserUsage(entries);
@@ -98,6 +99,10 @@ console.log(JSON.stringify({success: true, data}));
 		assert.match(failed.openai.error!, /HTTP 503/);
 		assert.match(failed["openai-account-2"].error!, /HTTP 503/);
 		status = 200;
+		validPlan = false;
+		assert.match((await readBrowserUsage(entries)).openai.error!, /수치 없음/);
+		assert.equal((await readCachedUsage(entries)).openai.checkedAt, lastSuccess);
+		validPlan = true;
 		await readBrowserUsage(entries);
 		assert.equal((await readCachedUsage(entries)).openai.error, undefined, "successful refresh clears the saved failure");
 		assert.equal((await readCachedUsage([["openai", { clientId: "oaiapp_new" }]])).openai, undefined);

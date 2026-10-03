@@ -81,11 +81,11 @@ async function saveUsage(entries: Entries, result: Record<string, BrowserUsage>)
 }
 
 // Only read Codex-owned credentials; never refresh them or change model OAuth.
-// The account binding comes from the web's exact app-client-ID match, not email/order.
+// Discover new bindings from the server's exact app-client-ID match, not email/order.
 export async function readCodexUsage(entries: Entries): Promise<Record<string, BrowserUsage>> {
 	const saved = await readCachedUsage(entries);
 	const homes = process.env.OPENAI_ACCOUNTS_CODEX_HOMES?.split(path.delimiter).filter(Boolean)
-		?? [process.env.CODEX_HOME || path.join(os.homedir(), ".codex")];
+		?? [process.env.CODEX_HOME || path.join(os.homedir(), ".codex"), path.join(os.homedir(), ".codex-account-2")];
 	const credentials = await Promise.all(homes.map(async (home) => {
 		try {
 			const { tokens } = JSON.parse(await fs.readFile(path.join(home, "auth.json"), "utf8"));
@@ -93,23 +93,58 @@ export async function readCodexUsage(entries: Entries): Promise<Record<string, B
 			const [, payload] = tokens.access_token.split(".");
 			const claims = JSON.parse(Buffer.from(payload, "base64url").toString());
 			if (claims["https://api.openai.com/auth"]?.chatgpt_account_id !== tokens.account_id) return undefined;
-			return { access: tokens.access_token as string, accountId: tokens.account_id as string };
+			return { access: tokens.access_token as string, accountId: tokens.account_id as string, home };
 		} catch { return undefined; }
 	}));
+	const available = credentials.filter((item) => item !== undefined);
+	const bindings = new Map<string, (typeof available)[number]>();
+	for (const [provider] of entries) {
+		const credential = available.find((item) => item.accountId === saved[provider]?.accountId);
+		if (credential) bindings.set(provider, credential);
+	}
+	const unbound = entries.filter(([provider, credential]) =>
+		!bindings.has(provider) && credential.clientId?.startsWith("oaiapp_"));
+	const failures: string[] = [];
+	if (unbound.length) {
+		const discovered = await Promise.all(available.map(async (credential) => {
+			try {
+				const response = await fetch(`https://chatgpt.com${appsPath}`, {
+					headers: { Accept: "application/json", Authorization: `Bearer ${credential.access}`, "ChatGPT-Account-Id": credential.accountId },
+					redirect: "error", signal: AbortSignal.timeout(6000),
+				});
+				if (!response.ok) throw new Error(response.status === 401
+					? `Codex 조회 인증 만료 또는 접근 거부. 인증 폴더: ${credential.home}`
+					: `계정 연결 서버 HTTP ${response.status}`);
+				const apps: AppUsage = await response.json();
+				if (!Array.isArray(apps.items)) throw new Error("서버의 Pi 앱 목록 없음");
+				return { credential, items: apps.items };
+			} catch (error) {
+				failures.push(error instanceof Error && !["TypeError", "TimeoutError", "SyntaxError"].includes(error.name)
+					? error.message : "Codex 계정 연결 조회 실패 또는 시간 초과");
+			}
+		}));
+		for (const [provider, credential] of unbound) {
+			const matches = discovered.flatMap((item) =>
+				item?.items.some((app) => app?.id === credential.clientId) ? [item.credential] : []);
+			const accounts = new Set(matches.map((item) => item.accountId));
+			if (accounts.size === 1 && matches[0]) bindings.set(provider, matches[0]);
+			else if (accounts.size > 1) failures.push("Pi 앱이 여러 계정에서 확인됐습니다. 조회 인증 폴더를 확인하세요.");
+		}
+	}
 	const result: Record<string, BrowserUsage> = Object.fromEntries(await Promise.all(entries.map(async ([provider]) => {
-		const accountId = saved[provider]?.accountId;
-		const credential = accountId && credentials.find((item) => item?.accountId === accountId);
+		const credential = bindings.get(provider);
 		let quota: BrowserUsage = { plan: [], app: [] };
-		if (!accountId) quota.error = "계정 확인 필요: /openai-accounts web으로 한 번 연결하세요.";
-		else if (!credential) quota.error = "동일 계정의 Codex 조회 인증 없음. Codex 로그인 또는 /openai-accounts web이 필요합니다.";
+		if (!available.length) quota.error = "Codex 조회 인증 없음. README의 '한도 조회용 인증' 설정을 완료하세요.";
+		else if (!credential) quota.error = failures.join(" / ") || "동일 계정의 Codex 조회 인증 없음. Pi와 Codex 로그인 계정이 같은지 확인하세요. README의 '한도 조회용 인증'을 참고하세요.";
 		else {
+			const accountId = credential.accountId;
 			try {
 				const response = await fetch(`https://chatgpt.com${usagePath}`, {
 					headers: { Accept: "application/json", Authorization: `Bearer ${credential.access}`, "ChatGPT-Account-Id": accountId },
 					redirect: "error", signal: AbortSignal.timeout(6000),
 				});
 				if (!response.ok) throw new Error(response.status === 401
-					? "Codex 조회 인증 만료 또는 접근 거부. Codex에서 인증을 갱신하세요."
+					? `Codex 조회 인증 만료 또는 접근 거부. 인증 폴더: ${credential.home}. README의 '인증 갱신'을 참고하세요.`
 					: `한도 서버 HTTP ${response.status}`);
 				const body: UsageBody = await response.json();
 				const plan = [body.rate_limit?.primary_window, body.rate_limit?.secondary_window]
@@ -141,7 +176,7 @@ export async function readBrowserUsage(entries: Entries): Promise<Record<string,
 		const env = { ...process.env, AB_PROFILE: profile, AB_SESSION: `${process.pid}-usage` };
 		async function ab(...args: string[]) {
 			try {
-				const { stdout } = await run("ab", ["--json", ...args], { env, timeout: 10000, maxBuffer: 4 * 1024 * 1024 });
+				const { stdout } = await run("ab", ["--json", ...args], { env, timeout: 30000, maxBuffer: 4 * 1024 * 1024 });
 				const response = JSON.parse(stdout);
 				if (!response.success) throw new Error("Browser unavailable");
 				return response.data;
@@ -185,7 +220,11 @@ export async function readBrowserUsage(entries: Entries): Promise<Record<string,
 			for (const [provider, credential] of clients) {
 				if (!credential.clientId) continue;
 				const matched = usageForClient(usage, apps, credential.clientId);
-				if (matched) result[provider] = { ...matched, accountId: headers["chatgpt-account-id"], source: "web", checkedAt: Date.now() };
+				if (matched) {
+					if (!matched.plan.length || matched.plan.some((window) => remaining(window) === undefined))
+						throw new Error(`${profile}: 서버의 플랜 한도 수치 없음`);
+					result[provider] = { ...matched, accountId: headers["chatgpt-account-id"], source: "web", checkedAt: Date.now() };
+				}
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "조회 실패";

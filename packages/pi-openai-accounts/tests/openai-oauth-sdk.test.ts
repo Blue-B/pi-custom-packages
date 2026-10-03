@@ -208,7 +208,9 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 				} as any);
 				assert.ok(quotaWidgets.some((lines) => /플랜 주간.*75% 남음/.test(lines) && lines.includes("Codex 조회")));
 				assert.ok(quotaWidgets.every((lines) => !lines.includes("Pi 앱")));
-				assert.ok(quotaWidgets.some((lines) => lines.includes("계정 확인 필요")));
+				assert.ok(quotaWidgets.some((lines) => lines.includes("현재 한도 확인 불가") &&
+					lines.includes("동일 계정의 Codex 조회 인증 없음")));
+				assert.ok(quotaWidgets.every((lines) => !lines.includes("web으로 한 번 연결")));
 				assert.equal(await fs.stat(browserMarker).catch(() => undefined), undefined);
 				assert.equal(await fs.readFile(authPath, "utf8"), unchangedAuth);
 				assert.equal(apiCalls, 3);

@@ -192,7 +192,7 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 						const weekly = quota?.plan.find((window) => window.limit_window_seconds === 604800);
 						const left = weekly && remaining(weekly);
 						return accountRow(provider, credential, ctx.model?.provider, quota?.email)
-							+ (left !== undefined ? `  플랜 주간 ${left}% 남음` : "");
+							+ (left !== undefined ? `  이전 조회 주간 ${left}% 남음` : "");
 					});
 					const renderQuotas = (updating: boolean) => {
 						const lines = entries.flatMap(([provider, credential]) => {
@@ -200,11 +200,12 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 							const wait = Math.max(0, Math.ceil(((cooldowns.get(provider) ?? 0) - Date.now()) / 60_000));
 							return [
 								` ${accountRow(provider, credential, ctx.model?.provider, quota?.email)}  누적 토큰 ${formatTokens(usage[provider]?.total ?? 0)}`,
+								...(quota?.error ? [`     └ 현재 한도 확인 불가: ${quota.error}`]
+									: updating ? ["     └ 현재 한도 갱신 중"] : []),
 								...(quota?.plan.length ? [
-									...quota.plan.map((window) => windowLine("플랜", window)),
+									...quota.plan.map((window) => windowLine(quota.error || updating ? "이전 조회 플랜" : "플랜", window)),
 									`     └ 마지막 조회 ${new Date(quota.checkedAt ?? 0).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}${quota.source ? ` (${quota.source === "codex" ? "Codex" : "웹"} 조회)` : ""}${updating ? " (갱신 중)" : ""}`,
 								] : [`     └ ${quota?.error || (updating ? "한도 조회 중 (계정 전환은 바로 가능)" : "아직 조회된 한도 없음")}`]),
-								...(quota?.error && quota.plan.length ? [`     └ ${quota.error} (이전 조회값 유지)`] : []),
 								...(wait ? [`     └ 자동 전환 대기 ${wait}분`] : []),
 							];
 						});

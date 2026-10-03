@@ -79,7 +79,7 @@ it through `powershell.exe` over WSL interop, with no Linux-side installation.
 | [pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked) | [herdr](https://herdr.dev)'s sidebar shows a pane as working the entire time pi is actually waiting on an `ask_user_question` answer. This emits the blocked event herdr's own integration already listens for. |
 | [pi-herdr-subagent-working](./packages/pi-herdr-subagent-working) | Keeps a herdr pane working while async `pi-subagents` children are still running. Replaces herdr's managed Pi reporter, so it is installed separately rather than through the root bundle. |
 | [pi-remote-pi-space-name](./packages/pi-remote-pi-space-name) | A dozen [herdr](https://herdr.dev) Spaces share one directory, so [remote-pi](https://remote-pi.jacobmoura.work)'s phone tiles all read `shell`, `shell#2`, `shell#3`. Titles each tile with its Space label instead, keeps two Spaces named `~` both called `~`, and renames the tile in place when the Space is renamed. Ships a patch script. |
-| [pi-openai-accounts](./packages/pi-openai-accounts) | Switches between two ChatGPT subscription OAuth accounts (`openai`, `openai-account-2`). Preserves the account when changing models and rotates on quota errors without duplicate retries. `/openai-accounts` shows local token totals, not remaining subscription quota. Requires Pi 0.99.2+. |
+| [pi-openai-accounts](./packages/pi-openai-accounts) | Switches between two ChatGPT subscription OAuth accounts (`openai`, `openai-account-2`). Preserves the account when changing models and rotates on quota errors without duplicate retries. `/openai-accounts` shows plan quotas through separate Codex credentials, with automatic account binding and no browser during refresh. Local token totals are shown separately. Requires Pi 0.99.2+; see the package README for first-time quota setup. |
 
 ## Platform support
 
@@ -94,7 +94,8 @@ The other packages each want something specific.
 | [herdr](https://herdr.dev) with `herdr integration install pi` | herdr-ask-blocked |
 | [herdr](https://herdr.dev) and [pi-subagents](https://www.npmjs.com/package/pi-subagents); replaces the managed Pi reporter | herdr-subagent-working |
 | [herdr](https://herdr.dev) and [remote-pi](https://www.npmjs.com/package/remote-pi) | remote-pi-space-name |
-| A ChatGPT or Codex OAuth login | gpt-img, codex-accounts |
+| A ChatGPT or Codex OAuth login | gpt-img |
+| Pi 0.99.2+ and ChatGPT OAuth; Codex CLI file credentials for quota lookup | openai-accounts |
 
 Windows screen capture requires WSL interop; native Linux has no Windows desktop
 to capture.
