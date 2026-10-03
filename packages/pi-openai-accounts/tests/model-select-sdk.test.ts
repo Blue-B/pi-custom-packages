@@ -46,7 +46,8 @@ test("/model preserves the official account and commands explicitly switch it", 
 				provider: "commandcode", id: "deepseek/deepseek-v4.1-flash" });
 			const commands = loader.getExtensions().extensions[0].commands;
 			const command = commands.get("openai-accounts")!;
-			assert.equal(commands.get("codex-accounts")!.handler, command.handler);
+			assert.ok(command);
+			assert.equal(commands.has("codex-accounts"), false);
 			const notices: string[] = [];
 			const context = (index: number) => ({
 				get model() { return session.model; },

@@ -10,8 +10,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { withFileLock } from "./lock.ts";
 import { accountToKeep, isAccountProvider, modelForAccount } from "./model.ts";
+import { readBrowserUsage, readCodexUsage, readCachedUsage, remaining, windowLine, type BrowserUsage } from "./usage.ts";
 
-type Credential = { type?: string; access?: string };
+type Credential = { type?: string; access?: string; clientId?: string };
 type TokenUsage = {
 	input: number;
 	output: number;
@@ -52,13 +53,13 @@ async function readAccounts(): Promise<[string, Credential][]> {
 		.sort(([a], [b]) => accountNumber(a) - accountNumber(b));
 }
 
-function emailFromToken(token = ""): string {
+function accountLabelFromToken(token = ""): string {
 	try {
 		const [, payloadPart] = token.split(".");
 		const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString());
-		return payload["https://api.openai.com/profile"]?.email ?? payload.email ?? "이메일 없음";
+		return payload["https://api.openai.com/profile"]?.email || payload.email || "ChatGPT 로그인됨";
 	} catch {
-		return "이메일 확인 불가";
+		return "ChatGPT 로그인됨";
 	}
 }
 
@@ -82,8 +83,8 @@ function formatTokens(tokens: number): string {
 	return String(tokens);
 }
 
-function accountRow(provider: string, credential: Credential, current?: string): string {
-	return `${provider === current ? "●" : "○"} ${accountNumber(provider)}번  ${emailFromToken(credential.access)}${provider === current ? "  ← 현재" : ""}`;
+function accountRow(provider: string, credential: Credential, current?: string, email?: string): string {
+	return `${provider === current ? "●" : "○"} ${accountNumber(provider)}번  ${email || accountLabelFromToken(credential.access)}${provider === current ? "  ← 현재" : ""}`;
 }
 
 function retryCountSinceLastUser(ctx: ExtensionContext): number {
@@ -115,15 +116,26 @@ async function switchTo(provider: string, ctx: ExtensionContext, pi: ExtensionAP
 	return pi.setModel(target);
 }
 
-// Pi 0.99.2 detects subscription requests only for the literal "openai" provider.
-// Apply the same exclusions to aliases without changing message/account identity.
-function subscriptionOptions<T extends ProviderRequestOptions>(options?: T) {
+// Keep this request-local: stored tool calls/results must retain their matching IDs.
+function requestOptions<T extends ProviderRequestOptions>(options?: T, subscriptionAlias = false) {
 	return {
 		...options,
 		onPayload: async (payload: unknown, model: Model<Api>) => {
 			const request = { ...((await options?.onPayload?.(payload, model)) ?? payload) as Record<string, unknown> };
-			for (const field of ["max_output_tokens", "temperature", "prompt_cache_retention", "prompt_cache_options"])
-				delete request[field];
+			// Pi 0.99.2 can normalize replayed grammar-tool item IDs to fc_*.
+			// Custom calls require ctc_*; omit invalid item IDs rather than inventing one.
+			if (Array.isArray(request.input)) {
+				request.input = request.input.map((item) => {
+					if (item?.type !== "custom_tool_call" || typeof item.id !== "string" || item.id.startsWith("ctc_")) return item;
+					const { id: _id, ...call } = item;
+					return call;
+				});
+			}
+			// Pi only detects subscription requests for the literal "openai" provider.
+			if (subscriptionAlias) {
+				for (const field of ["max_output_tokens", "temperature", "prompt_cache_retention", "prompt_cache_options"])
+					delete request[field];
+			}
 			return request;
 		},
 	};
@@ -133,6 +145,11 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 	const runtime = await ModelRuntime.create();
 	const official = runtime.getProvider("openai");
 	if (!official?.auth.oauth) throw new Error("OpenAI ChatGPT OAuth provider unavailable (Pi 0.99.2 이상 필요)");
+	pi.registerProvider({
+		...official,
+		stream: (model, context, options) => official.stream<Api>(model, context, requestOptions(options)),
+		streamSimple: (model, context, options) => official.streamSimple(model, context, requestOptions(options)),
+	});
 	const id = "openai-account-2";
 	// Native OAuth owns deviceId, issued clientId/scopes, refresh and API routing.
 	pi.registerProvider({
@@ -142,8 +159,8 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 		auth: { oauth: official.auth.oauth },
 		getModels: () => official.getModels().map((m) => ({ ...m, provider: id })),
 		getAllModels: () => (official.getAllModels?.() ?? official.getModels()).map((m) => ({ ...m, provider: id })),
-		stream: (model, context, options) => official.stream<Api>(model, context, subscriptionOptions(options)),
-		streamSimple: (model, context, options) => official.streamSimple(model, context, subscriptionOptions(options)),
+		stream: (model, context, options) => official.stream<Api>(model, context, requestOptions(options, true)),
+		streamSimple: (model, context, options) => official.streamSimple(model, context, requestOptions(options, true)),
 	});
 
 	let switchingAccount = false;
@@ -156,9 +173,11 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 		}
 	}
 
+	const quotaLookups: Partial<Record<"codex" | "web", Promise<Record<string, BrowserUsage>>>> = {};
 	const accountCommand = {
 		description: "ChatGPT 구독 계정 2개를 확인하고 전환",
-		handler: async (_args: string, ctx: ExtensionContext) => {
+		handler: async (args: string, ctx: ExtensionContext) => {
+			const source = args.trim() === "web" ? "web" : "codex";
 			try {
 				for (;;) {
 					const entries = await readAccounts();
@@ -167,20 +186,54 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 						return;
 					}
 					const usage = await readTokenUsage();
-					const rows = entries.map(([provider, credential]) => accountRow(provider, credential, ctx.model?.provider));
-					const lines = entries.flatMap(([provider], i) => {
-						const wait = Math.max(0, Math.ceil(((cooldowns.get(provider) ?? 0) - Date.now()) / 60_000));
-						return [
-							` ${rows[i]}  누적 토큰 ${formatTokens(usage[provider]?.total ?? 0)}`,
-							`     └ 구독 잔여 한도 조회 미지원${wait ? `  자동 전환 대기 ${wait}분` : ""}`,
-						];
+					let quotas = await readCachedUsage(entries);
+					const rows = entries.map(([provider, credential]) => {
+						const quota = quotas[provider];
+						const weekly = quota?.plan.find((window) => window.limit_window_seconds === 604800);
+						const left = weekly && remaining(weekly);
+						return accountRow(provider, credential, ctx.model?.provider, quota?.email)
+							+ (left !== undefined ? `  플랜 주간 ${left}% 남음` : "");
 					});
-					ctx.ui.setWidget("codex-accounts-table", [
-						` ChatGPT 구독 계정 │ 현재: ${ctx.model?.provider ?? "모델 없음"}`,
-						...lines,
-					], { placement: "aboveEditor" });
+					const renderQuotas = (updating: boolean) => {
+						const lines = entries.flatMap(([provider, credential]) => {
+							const quota = quotas[provider];
+							const wait = Math.max(0, Math.ceil(((cooldowns.get(provider) ?? 0) - Date.now()) / 60_000));
+							return [
+								` ${accountRow(provider, credential, ctx.model?.provider, quota?.email)}  누적 토큰 ${formatTokens(usage[provider]?.total ?? 0)}`,
+								...(quota?.plan.length ? [
+									...quota.plan.map((window) => windowLine("플랜", window)),
+									`     └ 마지막 조회 ${new Date(quota.checkedAt ?? 0).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}${quota.source ? ` (${quota.source === "codex" ? "Codex" : "웹"} 조회)` : ""}${updating ? " (갱신 중)" : ""}`,
+								] : [`     └ ${quota?.error || (updating ? "한도 조회 중 (계정 전환은 바로 가능)" : "아직 조회된 한도 없음")}`]),
+								...(quota?.error && quota.plan.length ? [`     └ ${quota.error} (이전 조회값 유지)`] : []),
+								...(wait ? [`     └ 자동 전환 대기 ${wait}분`] : []),
+							];
+						});
+						ctx.ui.setWidget("codex-accounts-table", [
+							` ChatGPT 구독 계정 │ 로그인 ${entries.length}/2개 │ 현재: ${ctx.model?.provider ?? "모델 없음"}`,
+							...lines,
+						], { placement: "aboveEditor" });
+					};
+					let menuOpen = true;
+					renderQuotas(true);
+					const lookup = quotaLookups[source] ??= (source === "web" ? readBrowserUsage(entries) : readCodexUsage(entries))
+						.finally(() => { delete quotaLookups[source]; });
+					void lookup.then((updated) => {
+						for (const [provider, quota] of Object.entries(updated)) {
+							quotas[provider] = quota.error && quotas[provider]
+								? { ...quotas[provider], error: quota.error } : quota;
+						}
+						if (menuOpen) renderQuotas(false);
+					}).catch(() => {
+						for (const [provider] of entries) quotas[provider] = {
+							...(quotas[provider] ?? { plan: [], app: [] }), error: "한도 조회 실패. 새로고침으로 다시 시도하세요.",
+						};
+						if (menuOpen) renderQuotas(false);
+					});
 					const refresh = "새로고침", close = "닫기";
-					const choice = await ctx.ui.select("전환할 계정 선택 (상세는 위 표 참고)", [...rows, refresh, close]);
+					let choice: string | undefined;
+					try {
+						choice = await ctx.ui.select(`ChatGPT 로그인 ${entries.length}/2개: 전환할 계정 선택 (한도는 위 표)`, [...rows, refresh, close]);
+					} finally { menuOpen = false; }
 					if (!choice || choice === close) return;
 					if (choice === refresh) continue;
 					const selected = entries[rows.indexOf(choice)];
@@ -196,7 +249,6 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 		},
 	};
 	pi.registerCommand("openai-accounts", accountCommand);
-	pi.registerCommand("codex-accounts", accountCommand); // Preserve the familiar command, not legacy authentication.
 
 	pi.on("model_select", async (event) => {
 		if (switchingAccount) return;

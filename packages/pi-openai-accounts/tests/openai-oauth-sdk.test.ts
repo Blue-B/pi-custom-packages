@@ -125,6 +125,12 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 			assert.equal(usage[alias.provider].resetAt, undefined, "local totals do not invent subscription reset windows");
 			assert.equal(apiCalls, 3);
 
+			// Native direct OAuth tokens can identify a user without carrying an email.
+			const menuAuth = JSON.parse(await fs.readFile(authPath, "utf8"));
+			const menuToken = (payload: object) => `header.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.signature`;
+			menuAuth.openai.access = menuToken({ sub: "user-one", email: "one@example.com" });
+			menuAuth[alias.provider].access = menuToken({ sub: "user-two", "https://api.openai.com/auth": {} });
+			await fs.writeFile(authPath, JSON.stringify(menuAuth));
 			const command = loader.getExtensions().extensions[0].commands.get("openai-accounts")!;
 			const widgets: string[] = [];
 			let selections = 0;
@@ -132,14 +138,86 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 				get model() { return session.model; },
 				modelRegistry: (session as any)._extensionRunner.getModelRegistry(),
 				ui: { setWidget: (_key: string, lines?: string[]) => { if (lines) widgets.push(lines.join("\n")); },
-					select: async (_title: string, choices: string[]) => {
+					select: async (title: string, choices: string[]) => {
+						assert.ok(title.includes("로그인 2/2개"));
 						assert.equal(choices.length, 4, "only two accounts, refresh and close");
+						assert.ok(choices[0].includes("1번  one@example.com"));
+						assert.ok(choices[1].includes("2번  ChatGPT 로그인됨"));
+						assert.ok(choices[1].includes("← 현재"));
+						assert.equal(choices.some((choice) => choice.includes("이메일 없음")), false);
 						return selections++ === 0 ? choices[2] : choices[1];
 					}, notify() {} },
 			} as any);
 			assert.equal(session.model?.provider, "openai-account-2");
-			assert.ok(widgets[0].includes("한도 조회 미지원"));
+			assert.ok(widgets[0].includes("한도 조회 중"));
+			assert.ok(widgets[0].includes("로그인 2/2개"));
 			assert.equal(apiCalls, 3, "account menus must never send direct tokens to legacy endpoints");
+
+			// Codex reads are non-blocking; menus never start a browser or show app limits.
+			const previousPath = process.env.PATH;
+			const previousCodexHome = process.env.CODEX_HOME;
+			const previousCodexHomes = process.env.OPENAI_ACCOUNTS_CODEX_HOMES;
+			const browserMarker = path.join(home, "browser-started");
+			await fs.writeFile(path.join(home, "ab"), `#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(browserMarker)}, 'started');\n`, { mode: 0o700 });
+			menuAuth.openai.clientId = "oaiapp_slow";
+			await fs.writeFile(authPath, JSON.stringify(menuAuth));
+			const unchangedAuth = await fs.readFile(authPath, "utf8");
+			const codexHome = path.join(home, ".codex");
+			await fs.mkdir(codexHome);
+			await fs.writeFile(path.join(codexHome, "auth.json"), JSON.stringify({ tokens: {
+				access_token: menuToken({ "https://api.openai.com/auth": { chatgpt_account_id: "account-one" } }),
+				account_id: "account-one",
+			} }));
+			await fs.writeFile(path.join(agentDir, "openai-account-quota.json"), JSON.stringify({
+				oaiapp_slow: { accountId: "account-one", email: "one@example.com", source: "web", checkedAt: Date.now(),
+					plan: [{ used_percent: 74, limit_window_seconds: 604800 }], app: [{ used_percent: 1, limit_window_seconds: 604800 }] },
+			}));
+			let quotaCalls = 0;
+			mock.method(globalThis, "fetch", async (url: string) => {
+				assert.equal(url, "https://chatgpt.com/backend-api/wham/usage");
+				quotaCalls++;
+				await new Promise((resolve) => setTimeout(resolve, 800));
+				return new Response(JSON.stringify({ rate_limit: { primary_window: { used_percent: 25, limit_window_seconds: 604800 } } }));
+			});
+			try {
+				process.env.PATH = `${home}${path.delimiter}${previousPath}`;
+				process.env.CODEX_HOME = codexHome;
+				delete process.env.OPENAI_ACCOUNTS_CODEX_HOMES;
+				const start = Date.now();
+				let shownAt = 0;
+				let closed = false;
+				let lateWidgets = 0;
+				await command.handler("", {
+					get model() { return session.model; },
+					ui: {
+						setWidget: (_key: string, lines?: string[]) => { if (!lines) closed = true; else if (closed) lateWidgets++; },
+						select: async () => { shownAt = Date.now(); return "닫기"; }, notify() {},
+					},
+				} as any);
+				assert.ok(shownAt - start < 500, `picker blocked for ${shownAt - start}ms`);
+				await new Promise((resolve) => setTimeout(resolve, 1100));
+				assert.equal(lateWidgets, 0);
+				assert.equal(quotaCalls, 1);
+				const quotaWidgets: string[] = [];
+				await command.handler("", {
+					get model() { return session.model; },
+					ui: {
+						setWidget: (_key: string, lines?: string[]) => { if (lines) quotaWidgets.push(lines.join("\n")); },
+						select: async () => { await new Promise((resolve) => setTimeout(resolve, 1100)); return "닫기"; }, notify() {},
+					},
+				} as any);
+				assert.ok(quotaWidgets.some((lines) => /플랜 주간.*75% 남음/.test(lines) && lines.includes("Codex 조회")));
+				assert.ok(quotaWidgets.every((lines) => !lines.includes("Pi 앱")));
+				assert.ok(quotaWidgets.some((lines) => lines.includes("계정 확인 필요")));
+				assert.equal(await fs.stat(browserMarker).catch(() => undefined), undefined);
+				assert.equal(await fs.readFile(authPath, "utf8"), unchangedAuth);
+				assert.equal(apiCalls, 3);
+			} finally {
+				if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath;
+				if (previousCodexHome === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = previousCodexHome;
+				if (previousCodexHomes === undefined) delete process.env.OPENAI_ACCOUNTS_CODEX_HOMES;
+				else process.env.OPENAI_ACCOUNTS_CODEX_HOMES = previousCodexHomes;
+			}
 		} finally { session.dispose(); }
 	} finally {
 		mock.restoreAll();
