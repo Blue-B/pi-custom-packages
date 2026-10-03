@@ -2,7 +2,7 @@
 
 ![pi-custom-packages](./assets/banner.png)
 
-Eight small packages for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
+Small packages for the [pi coding agent](https://github.com/earendil-works/pi), kept in one repo.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![pi](https://img.shields.io/badge/pi-tested%20on%200.84-8A2BE2)](https://github.com/earendil-works/pi)
@@ -15,7 +15,7 @@ not because they form a system. Take the one you need.
 
 ## Install
 
-Seven of the eight, straight from git:
+Install the bundled packages straight from git:
 
 ```bash
 pi install git:github.com/Blue-B/pi-custom-packages
@@ -56,6 +56,12 @@ nobody checked. These two watch for that.
 | [pi-verify-gate](./packages/pi-verify-gate) | `/verify` (alias `/검증`) pulls the raw tool calls and results of the agent's last turn straight out of the session log, writes them to a file, and has a fresh-context `reviewer` subagent grade the conclusion against them. The agent never picks the target or supplies the evidence. Needs [pi-subagents](https://www.npmjs.com/package/pi-subagents). |
 | [pi-bash-watchdog](./packages/pi-bash-watchdog) | pi's bash timeout is in seconds, and models keep passing milliseconds. Rewrites `120000` to `120`, caps foreground dev servers, fills a default when the field is missing. Adds `/bash-watchdog-status`. |
 
+### Work timing
+
+| Package | What it does |
+| --- | --- |
+| [pi-elapsed-timer](./packages/pi-elapsed-timer) | Shows elapsed time once a second while pi works on a request, then keeps the run's total in the footer. Uses the same timer as the standalone `elapsed-timer.ts` extension. |
+
 ### Windows desktop
 
 pi runs in WSL and cannot see the Windows desktop directly. `pi-winshot` captures
@@ -77,8 +83,8 @@ it through `powershell.exe` over WSL interop, with no Linux-side installation.
 
 ## Platform support
 
-One of the eight needs nothing beyond pi itself: bash-watchdog.
-The other seven each want something specific.
+Bash-watchdog and elapsed-timer need nothing beyond pi itself.
+The other packages each want something specific.
 
 | Needs | Packages |
 | --- | --- |

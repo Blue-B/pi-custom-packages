@@ -1,0 +1,39 @@
+{
+  "name": "pi-elapsed-timer",
+  "version": "0.1.0",
+  "description": "Shows elapsed time while pi works and keeps the last run's total in the footer.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Blue-B",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "timer",
+    "elapsed"
+  ],
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-elapsed-timer"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/elapsed-timer/index.ts"
+    ]
+  }
+}
