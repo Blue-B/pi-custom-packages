@@ -87,18 +87,19 @@ function accountRow(provider: string, credential: Credential, current?: string, 
 	return `${provider === current ? "●" : "○"} ${accountNumber(provider)}번  ${email || accountLabelFromToken(credential.access)}${provider === current ? "  ← 현재" : ""}`;
 }
 
-function retryCountSinceLastUser(ctx: ExtensionContext): number {
-	let retries = 0;
+// Accounts that hit a limit during the current user request. Persisted in the session, so reloads cannot loop.
+function limitedSinceLastUser(ctx: ExtensionContext): Set<string> {
+	const limited = new Set<string>();
 	for (const entry of ctx.sessionManager.getBranch()) {
-		if (entry.type === "custom_message" && entry.customType === "codex-account-retry") {
-			retries++;
-			continue;
-		}
 		if (entry.type !== "message") continue;
-		if (entry.message.role === "user") retries = 0;
-		else if (entry.message.role === "custom" && entry.message.customType === "codex-account-retry") retries++;
+		const message = entry.message;
+		if (message.role === "user") limited.clear();
+		else if (
+			message.role === "assistant" && message.stopReason === "error" &&
+			isAccountProvider(message.provider) && limitPattern.test(message.errorMessage ?? "")
+		) limited.add(message.provider);
 	}
-	return retries;
+	return limited;
 }
 
 async function switchTo(provider: string, ctx: ExtensionContext, pi: ExtensionAPI): Promise<boolean> {
@@ -266,7 +267,6 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 				model: ExtensionContext["model"];
 				signal: AbortSignal | undefined;
 				revision: number;
-				maxRetries: number;
 		  }
 		| undefined;
 	const invalidateRetry = () => {
@@ -289,7 +289,7 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 		) return;
 		const leaf = ctx.sessionManager.getBranch().at(-1);
 		if (
-			retryCountSinceLastUser(ctx) >= retry.maxRetries || leaf?.type !== "message" ||
+			leaf?.type !== "message" ||
 			leaf.message !== retry.message || leaf.message.role !== "assistant" ||
 			leaf.message.stopReason !== "error"
 		) return;
@@ -342,17 +342,14 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 			!limitPattern.test(event.message.errorMessage ?? "") || !stillCurrent()
 		) return;
 		const entries = await readAccounts();
-		const maxRetries = Math.max(0, entries.length - 1);
-		if (!isRetryableAssistantError(event.message) && retryCountSinceLastUser(ctx) >= maxRetries) {
-			ctx.ui.notify("이 요청의 ChatGPT 자동 재개 횟수를 모두 사용했습니다. 직접 다시 요청하세요.", "error");
-			return;
-		}
+		// This failure is persisted only after message_end handlers run.
+		const limited = limitedSinceLastUser(ctx).add(current);
 		// ponytail: reset time is unknown; use a process-local 1h cooldown until a supported quota API exists.
 		cooldowns.set(current, Date.now() + 60 * 60 * 1000);
 		const next = entries.find(([provider]) =>
-			provider !== current && (cooldowns.get(provider) ?? 0) <= Date.now());
+			!limited.has(provider) && (cooldowns.get(provider) ?? 0) <= Date.now());
 		if (!next) {
-			ctx.ui.notify("모든 ChatGPT 계정이 한도 오류 또는 대기 상태입니다.", "error");
+			ctx.ui.notify("모든 ChatGPT 계정이 한도에 걸렸습니다. 한도가 초기화된 뒤 다시 요청하세요.", "error");
 			return;
 		}
 		if (!stillCurrent() || !(await switchAccount(next[0], ctx))) return;
@@ -363,7 +360,7 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 		) {
 			pendingRetry = {
 				message: event.message, sessionId: failedSessionId, model: ctx.model,
-				signal: failedSignal, revision, maxRetries,
+				signal: failedSignal, revision,
 			};
 		}
 		ctx.ui.notify(`${accountNumber(next[0])}번 계정으로 전환했습니다. 같은 오류로 멈춰 있으면 현재 응답만 자동으로 이어갑니다.`, "warning");

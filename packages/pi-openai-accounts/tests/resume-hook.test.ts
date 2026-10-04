@@ -143,6 +143,12 @@ test("only the settled current failure resumes, without replaying a user request
 					(ctx.sessionManager as SessionManager).appendCustomMessageEntry(
 						"codex-account-retry", "previous continuation", true,
 					),
+				appendLimitError: (provider: string) =>
+					(ctx.sessionManager as SessionManager).appendMessage({
+						role: "assistant", provider, model: "scope-fixture", content: [],
+						timestamp: Date.now(), usage: { totalTokens: 0 }, stopReason: "error",
+						errorMessage: "The ChatGPT user has reached their Subscription Sharing usage limit.",
+					} as any),
 				fail,
 				sent,
 				aborter,
@@ -179,9 +185,20 @@ test("only the settled current failure resumes, without replaying a user request
 				);
 			},
 		);
+		await t.test("a re-selected exhausted account fails over to the untouched one", async () => {
+			const f = await fixture();
+			f.ctx.model = { ...f.ctx.model!, provider: providers[1] };
+			f.appendLimitError(providers[1]);
+			f.appendRetryNotice();
+			await f.fail();
+			await f.settle();
+			assert.equal(f.switches(), 1);
+			assert.equal(f.ctx.model!.provider, providers[0]);
+			assert.equal(f.sent.length, 1);
+		});
 		await t.test("a session reload cannot restart an exhausted retry chain", async () => {
 			const f = await fixture();
-			f.appendRetryNotice();
+			f.appendLimitError(providers[1]);
 			f.appendRetryNotice();
 			await f.fail();
 			await f.settle();
