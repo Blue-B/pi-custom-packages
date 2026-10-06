@@ -56,9 +56,11 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 			sessionManager: SessionManager.inMemory(home), noTools: "all",
 		});
 		try {
-			// Session binding applies provider registrations; no extra slots are created.
+			// Session binding applies provider registrations; only the temporary Codex slot 3 is added.
 			assert.ok(runtime.getProvider("openai-account-2"));
-			assert.equal(runtime.getProvider("openai-account-3"), undefined);
+			const codex = runtime.getModel("openai-account-3", "gpt-6.1-sol")!;
+			assert.equal(codex.api, "openai-codex-responses");
+			assert.equal(codex.baseUrl, "https://chatgpt.com/backend-api");
 			assert.equal(runtime.getProvider("openai-codex-account-3"), undefined);
 			const alias = runtime.getModel("openai-account-2", "gpt-6.1-sol")!;
 			assert.ok(alias);
@@ -130,6 +132,7 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 			const menuToken = (payload: object) => `header.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.signature`;
 			menuAuth.openai.access = menuToken({ sub: "user-one", email: "one@example.com" });
 			menuAuth[alias.provider].access = menuToken({ sub: "user-two", "https://api.openai.com/auth": {} });
+			delete menuAuth["openai-account-3"]; // Codex slot 3 is optional; not logged in here.
 			await fs.writeFile(authPath, JSON.stringify(menuAuth));
 			const command = loader.getExtensions().extensions[0].commands.get("openai-accounts")!;
 			const widgets: string[] = [];
@@ -139,7 +142,7 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 				modelRegistry: (session as any)._extensionRunner.getModelRegistry(),
 				ui: { setWidget: (_key: string, lines?: string[]) => { if (lines) widgets.push(lines.join("\n")); },
 					select: async (title: string, choices: string[]) => {
-						assert.ok(title.includes("로그인 2/2개"));
+						assert.ok(title.includes("로그인 2/3개"));
 						assert.equal(choices.length, 4, "only two accounts, refresh and close");
 						assert.ok(choices[0].includes("1번  one@example.com"));
 						assert.ok(choices[1].includes("2번  ChatGPT 로그인됨"));
@@ -150,7 +153,7 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 			} as any);
 			assert.equal(session.model?.provider, "openai-account-2");
 			assert.ok(widgets[0].includes("한도 조회 중"));
-			assert.ok(widgets[0].includes("로그인 2/2개"));
+			assert.ok(widgets[0].includes("로그인 2/3개"));
 			assert.equal(apiCalls, 3, "account menus must never send direct tokens to legacy endpoints");
 
 			// Codex reads are non-blocking; menus never start a browser or show app limits.

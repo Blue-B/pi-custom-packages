@@ -9,7 +9,7 @@ import {
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { withFileLock } from "./lock.ts";
-import { accountToKeep, isAccountProvider, modelForAccount } from "./model.ts";
+import { accountToKeep, CODEX_ACCOUNT, isAccountProvider, modelForAccount } from "./model.ts";
 import { readBrowserUsage, readCodexUsage, readCachedUsage, remaining, windowLine, type BrowserUsage } from "./usage.ts";
 
 type Credential = { type?: string; access?: string; clientId?: string };
@@ -30,7 +30,7 @@ const limitPattern =
 	/429|rate[_ ]?limit|too many requests|usage[_ ]?limit|usage_not_included|quota|out of budget|available balance|billing hard limit|freeusagelimiterror|gousagelimiterror/i;
 
 function accountNumber(provider: string): number {
-	return provider === "openai" ? 1 : 2;
+	return provider === "openai" ? 1 : provider === CODEX_ACCOUNT ? 3 : 2;
 }
 
 async function readAccounts(): Promise<[string, Credential][]> {
@@ -163,6 +163,18 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 		stream: (model, context, options) => official.stream<Api>(model, context, requestOptions(options, true)),
 		streamSimple: (model, context, options) => official.streamSimple(model, context, requestOptions(options, true)),
 	});
+	// Legacy Codex OAuth works while Subscription Sharing is broken (openai/codex#51043). Same email as account 1 is fine.
+	const codex = runtime.getProvider("openai-codex");
+	if (codex?.auth.oauth) pi.registerProvider({
+		...codex,
+		id: CODEX_ACCOUNT,
+		name: "OpenAI Codex (3번 계정, 옛 방식)",
+		auth: { oauth: codex.auth.oauth },
+		getModels: () => codex.getModels().map((m) => ({ ...m, provider: CODEX_ACCOUNT })),
+		getAllModels: () => (codex.getAllModels?.() ?? codex.getModels()).map((m) => ({ ...m, provider: CODEX_ACCOUNT })),
+		stream: (model, context, options) => codex.stream<Api>(model, context, requestOptions(options)),
+		streamSimple: (model, context, options) => codex.streamSimple(model, context, requestOptions(options)),
+	});
 
 	let switchingAccount = false;
 	async function switchAccount(provider: string, ctx: ExtensionContext) {
@@ -176,14 +188,14 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 
 	const quotaLookups: Partial<Record<"codex" | "web", Promise<Record<string, BrowserUsage>>>> = {};
 	const accountCommand = {
-		description: "ChatGPT 구독 계정 2개를 확인하고 전환",
+		description: "ChatGPT 구독 계정을 확인하고 전환",
 		handler: async (args: string, ctx: ExtensionContext) => {
 			const source = args.trim() === "web" ? "web" : "codex";
 			try {
 				for (;;) {
 					const entries = await readAccounts();
 					if (!entries.length) {
-						ctx.ui.notify("/login openai와 /login openai-account-2에서 ChatGPT로 로그인하세요.", "info");
+						ctx.ui.notify("/login openai, /login openai-account-2, /login openai-account-3에서 ChatGPT로 로그인하세요.", "info");
 						return;
 					}
 					const usage = await readTokenUsage();
@@ -211,7 +223,7 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 							];
 						});
 						ctx.ui.setWidget("codex-accounts-table", [
-							` ChatGPT 구독 계정 │ 로그인 ${entries.length}/2개 │ 현재: ${ctx.model?.provider ?? "모델 없음"}`,
+							` ChatGPT 구독 계정 │ 로그인 ${entries.length}/3개 │ 현재: ${ctx.model?.provider ?? "모델 없음"}`,
 							...lines,
 						], { placement: "aboveEditor" });
 					};
@@ -234,7 +246,7 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 					const refresh = "새로고침", close = "닫기";
 					let choice: string | undefined;
 					try {
-						choice = await ctx.ui.select(`ChatGPT 로그인 ${entries.length}/2개: 전환할 계정 선택 (한도는 위 표)`, [...rows, refresh, close]);
+						choice = await ctx.ui.select(`ChatGPT 로그인 ${entries.length}/3개: 전환할 계정 선택 (한도는 위 표)`, [...rows, refresh, close]);
 					} finally { menuOpen = false; }
 					if (!choice || choice === close) return;
 					if (choice === refresh) continue;
@@ -252,10 +264,14 @@ export default async function openaiAccounts(pi: ExtensionAPI) {
 	};
 	pi.registerCommand("openai-accounts", accountCommand);
 
-	pi.on("model_select", async (event) => {
+	pi.on("model_select", async (event, ctx) => {
 		if (switchingAccount) return;
 		const keep = accountToKeep(event.previousModel?.provider, event.model.provider);
-		if (keep) await pi.setModel({ ...event.model, provider: keep });
+		if (!keep) return;
+		// Use the kept account's own model: account 3 needs the Codex API/baseUrl, not a relabeled openai model.
+		const target = modelForAccount(keep, event.model, ctx.modelRegistry.find(keep, event.model.id));
+		if (target) await pi.setModel(target);
+		else ctx.ui.notify(`${keep}에는 ${event.model.id} 모델이 없어 1번 계정으로 바뀌었습니다.`, "warning");
 	});
 
 	let usageWrite = Promise.resolve();
