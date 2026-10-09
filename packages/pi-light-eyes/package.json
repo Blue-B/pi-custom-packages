@@ -1,0 +1,46 @@
+{
+  "name": "pi-light-eyes",
+  "version": "0.1.0",
+  "description": "Light-terminal setup for pi that does not hurt your eyes: a soft off-white palette, grayscale antialiasing, and the D2Coding font registered so weight actually applies. Ships the pi theme plus scripts that write the Windows Terminal scheme.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-theme",
+    "theme",
+    "light-theme",
+    "windows-terminal",
+    "terminal",
+    "font",
+    "d2coding",
+    "korean",
+    "accessibility",
+    "eye-strain"
+  ],
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "files": [
+    "themes",
+    "scripts",
+    "skills",
+    "assets",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-light-eyes"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  }
+}
