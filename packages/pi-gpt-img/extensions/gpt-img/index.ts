@@ -131,7 +131,7 @@ async function loadCodexAuth(): Promise<{ token: string; accountId: string }> {
 	} catch {
 		throw new Error(`auth.json is not valid JSON: ${authPath}`);
 	}
-	const entry = data["openai-codex"] || data["codex"] || {};
+	const entry = data["openai-codex"] || data["openai-account-3"] || data["codex"] || {};
 	const token = entry.access || entry.token;
 	const accountId = entry.accountId || entry.account_id;
 	if (!token) {

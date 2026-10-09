@@ -12,7 +12,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 // Real Pi lifecycle and installed extension; auth and model responses are fake.
-test("installed failover cooperates with the actual Pi retry/settled lifecycle", {
+test("single-account errors leave retries to the actual Pi lifecycle", {
 	timeout: 30000,
 }, async (t) => {
 	const home = await fs.mkdtemp(path.join(os.tmpdir(), "codex-retry-sdk-"));
@@ -57,7 +57,6 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 		mock.method(Date, "now", () => originalNow() + clockOffset);
 		for (const scenario of [
 			"usage-limit",
-			"reverse-usage-limit",
 			"native-retry",
 			"abort",
 			"abort-backoff",
@@ -158,9 +157,7 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 							});
 					});
 				try {
-					if (scenario === "reverse-usage-limit") {
-						await session.setModel(runtime.getModel(providers[1], originalModel.id)!);
-					}
+					assert.equal(runtime.getProvider(providers[1]), undefined);
 					await session.prompt("안녕");
 					await session.waitForIdle();
 					await aborted;
@@ -175,9 +172,8 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 							modelApiCalls: 0,
 						}),
 					);
-					const expectedCalls = scenario.startsWith("abort") ? 1 : 2;
-					const expectedNotices =
-						scenario.endsWith("usage-limit") || scenario === "all-exhausted" ? 1 : 0;
+					const expectedCalls = scenario === "native-retry" ? 2 : 1;
+					const expectedNotices = 0;
 					assert.equal(calls.length, expectedCalls);
 					assert.equal(notices.length, expectedNotices);
 					assert.equal(
@@ -186,7 +182,7 @@ test("installed failover cooperates with the actual Pi retry/settled lifecycle",
 						"no duplicated user request",
 					);
 					if (expectedCalls > 1) {
-						assert.equal(calls[1], providers[scenario === "reverse-usage-limit" ? 0 : 1]);
+						assert.equal(calls[1], "openai");
 					}
 					if (!scenario.startsWith("abort")) {
 						assert.equal(session.model?.provider, calls.at(-1));

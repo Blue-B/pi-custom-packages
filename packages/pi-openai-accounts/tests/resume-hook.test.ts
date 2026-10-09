@@ -10,7 +10,7 @@ import {
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 
-test("only the settled current failure resumes, without replaying a user request", async (t) => {
+test("single-account failures never rotate or manufacture a continuation", async (t) => {
 	const home = await fs.mkdtemp(path.join(os.tmpdir(), "codex-current-retry-"));
 	const previousHome = process.env.HOME;
 	process.env.HOME = home;
@@ -166,17 +166,14 @@ test("only the settled current failure resumes, without replaying a user request
 			};
 		}
 		await t.test(
-			"one continuation, exact failed entry, no copied old request",
+			"no continuation or copied request when no other account remains",
 			async () => {
 				const f = await fixture();
-				const id = await f.fail();
+				await f.fail();
 				await f.settle();
 				await f.settle();
-				assert.equal(f.switches(), 1);
-				assert.equal(f.sent.length, 1);
-				assert.equal(f.sent[0].customType, "codex-account-retry");
-				assert.deepEqual(f.sent[0].details, { failedMessageId: id });
-				assert.doesNotMatch(f.sent[0].content, /Earlier task|안녕/);
+				assert.equal(f.switches(), 0);
+				assert.equal(f.sent.length, 0);
 				assert.equal(
 					f.ctx.sessionManager
 						.getBranch()
@@ -185,16 +182,16 @@ test("only the settled current failure resumes, without replaying a user request
 				);
 			},
 		);
-		await t.test("a re-selected exhausted account fails over to the untouched one", async () => {
+		await t.test("a stale removed account never triggers failover", async () => {
 			const f = await fixture();
 			f.ctx.model = { ...f.ctx.model!, provider: providers[1] };
 			f.appendLimitError(providers[1]);
 			f.appendRetryNotice();
 			await f.fail();
 			await f.settle();
-			assert.equal(f.switches(), 1);
-			assert.equal(f.ctx.model!.provider, providers[0]);
-			assert.equal(f.sent.length, 1);
+			assert.equal(f.switches(), 0);
+			assert.equal(f.ctx.model!.provider, providers[1]);
+			assert.equal(f.sent.length, 0);
 		});
 		await t.test("a session reload cannot restart an exhausted retry chain", async () => {
 			const f = await fixture();
@@ -207,7 +204,7 @@ test("only the settled current failure resumes, without replaying a user request
 			f.append("new user request");
 			await f.fail();
 			await f.settle();
-			assert.equal(f.sent.length, 1, "a new request gets its own retry budget");
+			assert.equal(f.sent.length, 0, "new requests cannot retry through the removed account");
 		});
 		for (const action of [
 			"input",

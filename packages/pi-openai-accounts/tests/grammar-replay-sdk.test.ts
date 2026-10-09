@@ -7,7 +7,7 @@ import {
 	createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
-test("native OpenAI requests replay grammar tools safely across both accounts", { timeout: 30000 }, async () => {
+test("remaining OpenAI account safely replays grammar tools from either account", { timeout: 30000 }, async () => {
 	const home = await fs.mkdtemp(path.join(os.tmpdir(), "openai-grammar-replay-"));
 	const previousHome = process.env.HOME;
 	process.env.HOME = home;
@@ -59,7 +59,7 @@ test("native OpenAI requests replay grammar tools safely across both accounts", 
 			name: "codemode", description: "Run code", parameters: { type: "object", properties: { code: { type: "string" } }, required: ["code"] },
 			constrainedSampling: { type: "grammar", variants: { openai_regex: ".*" } },
 		};
-		for (const target of providers) for (const source of providers) for (const prefix of ["ctc", "fc"]) {
+		for (const target of ["openai"]) for (const source of providers) for (const prefix of ["ctc", "fc"]) {
 			const model = runtime.getModel(target, "gpt-6.1-sol")!;
 			const context: any = { messages: [
 				{ role: "system", content: "Respond OK.", toolsAdded: [tool], timestamp: 0 },
@@ -81,7 +81,7 @@ test("native OpenAI requests replay grammar tools safely across both accounts", 
 				assert.deepEqual(context, before, "stored transcript must not be rewritten");
 			}
 		}
-		assert.equal(calls, 16);
+		assert.equal(calls, 8);
 	} finally {
 		session?.dispose();
 		mock.restoreAll();

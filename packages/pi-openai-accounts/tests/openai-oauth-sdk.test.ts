@@ -7,7 +7,7 @@ import {
 	createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
-test("two native ChatGPT accounts retain OAuth grants, routing and model metadata", { timeout: 30000 }, async () => {
+test("remaining native ChatGPT account retains OAuth grants, routing and model metadata", { timeout: 30000 }, async () => {
 	const home = await fs.mkdtemp(path.join(os.tmpdir(), "openai-accounts-"));
 	const previousHome = process.env.HOME;
 	process.env.HOME = home;
@@ -56,13 +56,13 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 			sessionManager: SessionManager.inMemory(home), noTools: "all",
 		});
 		try {
-			// Session binding applies provider registrations; only the temporary Codex slot 3 is added.
-			assert.ok(runtime.getProvider("openai-account-2"));
-			const codex = runtime.getModel("openai-account-3", "gpt-6.1-sol")!;
-			assert.equal(codex.api, "openai-codex-responses");
-			assert.equal(codex.baseUrl, "https://chatgpt.com/backend-api");
+			// Removed accounts must not be registered, even if stale credentials remain.
+			assert.equal(runtime.getProvider("openai-account-2"), undefined);
+			assert.equal(runtime.getModel("openai-account-2", "gpt-6.1-sol"), undefined);
+			assert.equal(runtime.getProvider("openai-account-3"), undefined);
+			assert.equal(runtime.getModel("openai-account-3", "gpt-6.1-sol"), undefined);
 			assert.equal(runtime.getProvider("openai-codex-account-3"), undefined);
-			const alias = runtime.getModel("openai-account-2", "gpt-6.1-sol")!;
+			const alias = runtime.getModel("openai", "gpt-6.1-sol")!;
 			assert.ok(alias);
 			assert.equal(alias.contextWindow, 1050000);
 			assert.equal(alias.maxTokens, 128000);
@@ -88,7 +88,7 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 				assert.equal(new Headers(options?.headers ?? input.headers).get("authorization"), "Bearer test-refreshed-token");
 				const payload = JSON.parse(options.body);
 				for (const field of ["max_output_tokens", "temperature", "prompt_cache_retention", "prompt_cache_options"])
-					assert.equal(field in payload, false, `subscription alias must omit ${field}`);
+					assert.equal(field in payload, false, `native subscription must omit ${field}`);
 				if (apiCalls < 2) assert.deepEqual(payload.metadata, { fixture: "hook-preserved" });
 				apiCalls++;
 				const events = [
@@ -112,7 +112,7 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 			};
 			const result = await runtime.completeSimple(alias, context, options);
 			assert.equal(result.stopReason, "stop", result.errorMessage ?? "Unexpected stop reason");
-			assert.equal(result.provider, "openai-account-2");
+			assert.equal(result.provider, "openai");
 			assert.deepEqual(result.content, [{ type: "text", text: "OK" }]);
 			assert.equal(apiCalls, 1);
 			const full = await runtime.complete(alias, context, options);
@@ -122,7 +122,7 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 			await session.setModel(alias);
 			await session.prompt("Say OK.");
 			await session.waitForIdle();
-			const usage = JSON.parse(await fs.readFile(path.join(agentDir, "codex-account-usage.json"), "utf8"));
+			const usage = JSON.parse(await fs.readFile(path.join(agentDir, "openai-account-usage.json"), "utf8"));
 			assert.equal(usage[alias.provider].total, 11);
 			assert.equal(usage[alias.provider].resetAt, undefined, "local totals do not invent subscription reset windows");
 			assert.equal(apiCalls, 3);
@@ -131,8 +131,6 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 			const menuAuth = JSON.parse(await fs.readFile(authPath, "utf8"));
 			const menuToken = (payload: object) => `header.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.signature`;
 			menuAuth.openai.access = menuToken({ sub: "user-one", email: "one@example.com" });
-			menuAuth[alias.provider].access = menuToken({ sub: "user-two", "https://api.openai.com/auth": {} });
-			delete menuAuth["openai-account-3"]; // Codex slot 3 is optional; not logged in here.
 			await fs.writeFile(authPath, JSON.stringify(menuAuth));
 			const command = loader.getExtensions().extensions[0].commands.get("openai-accounts")!;
 			const widgets: string[] = [];
@@ -142,18 +140,17 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 				modelRegistry: (session as any)._extensionRunner.getModelRegistry(),
 				ui: { setWidget: (_key: string, lines?: string[]) => { if (lines) widgets.push(lines.join("\n")); },
 					select: async (title: string, choices: string[]) => {
-						assert.ok(title.includes("로그인 2/3개"));
-						assert.equal(choices.length, 4, "only two accounts, refresh and close");
+						assert.ok(title.includes("로그인 1/1개"));
+						assert.equal(choices.length, 3, "only one account, refresh and close");
 						assert.ok(choices[0].includes("1번  one@example.com"));
-						assert.ok(choices[1].includes("2번  ChatGPT 로그인됨"));
-						assert.ok(choices[1].includes("← 현재"));
+						assert.ok(choices[0].includes("← 현재"));
 						assert.equal(choices.some((choice) => choice.includes("이메일 없음")), false);
-						return selections++ === 0 ? choices[2] : choices[1];
+						return selections++ === 0 ? choices[1] : choices[0];
 					}, notify() {} },
 			} as any);
-			assert.equal(session.model?.provider, "openai-account-2");
+			assert.equal(session.model?.provider, "openai");
 			assert.ok(widgets[0].includes("한도 조회 중"));
-			assert.ok(widgets[0].includes("로그인 2/3개"));
+			assert.ok(widgets[0].includes("로그인 1/1개"));
 			assert.equal(apiCalls, 3, "account menus must never send direct tokens to legacy endpoints");
 
 			// Codex reads are non-blocking; menus never start a browser or show app limits.
@@ -211,8 +208,6 @@ test("two native ChatGPT accounts retain OAuth grants, routing and model metadat
 				} as any);
 				assert.ok(quotaWidgets.some((lines) => /플랜 주간.*75% 남음/.test(lines) && lines.includes("Codex 조회")));
 				assert.ok(quotaWidgets.every((lines) => !lines.includes("Pi 앱")));
-				assert.ok(quotaWidgets.some((lines) => lines.includes("현재 한도 확인 불가") &&
-					lines.includes("동일 계정의 Codex 조회 인증 없음")));
 				assert.ok(quotaWidgets.every((lines) => !lines.includes("web으로 한 번 연결")));
 				assert.equal(await fs.stat(browserMarker).catch(() => undefined), undefined);
 				assert.equal(await fs.readFile(authPath, "utf8"), unchangedAuth);

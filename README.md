@@ -66,6 +66,7 @@ it through `powershell.exe` over WSL interop, with no Linux-side installation.
 | Package | What it does |
 | --- | --- |
 | [pi-winshot](./packages/pi-winshot) | Capture a screen, a region, a monitor, or one window even when five terminals sit on top of it. Then crop, resize, and mask the parts that should not reach the model. |
+| [pi-light-eyes](./packages/pi-light-eyes) | A light terminal that does not strain the eyes: soft off-white background, grayscale antialiasing, and D2Coding registered so `weight` actually applies. Ships the pi theme plus scripts that write the Windows Terminal scheme. |
 
 ### Everything else
 
@@ -83,7 +84,7 @@ The other packages each want something specific.
 
 | Needs | Packages |
 | --- | --- |
-| Windows 10/11 with WSL2 and interop | winshot |
+| Windows 10/11 with WSL2 and interop | winshot, light-eyes |
 | ffmpeg on `PATH` | winshot, gpt-img |
 | [herdr](https://herdr.dev) with `herdr integration install pi` | herdr-ask-blocked |
 | [herdr](https://herdr.dev) and [pi-subagents](https://www.npmjs.com/package/pi-subagents); replaces the managed Pi reporter | herdr-subagent-working |

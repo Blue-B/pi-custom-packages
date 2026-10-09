@@ -7,7 +7,7 @@ import {
 	createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
-test("/model preserves the official account and commands explicitly switch it", { timeout: 30000 }, async () => {
+test("/model and account menu only select the remaining official account", { timeout: 30000 }, async () => {
 	const home = await fs.mkdtemp(path.join(os.tmpdir(), "openai-model-select-"));
 	const previous = { HOME: process.env.HOME, PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME,
 		OPENAI_ACCOUNTS_CODEX_HOMES: process.env.OPENAI_ACCOUNTS_CODEX_HOMES };
@@ -24,7 +24,7 @@ test("/model preserves the official account and commands explicitly switch it", 
 		"openai-account-2": { type: "oauth", access: "fixture-only", clientId: "fixture-two" },
 	}));
 	await fs.writeFile(path.join(agentDir, "openai-account-quota.json"), JSON.stringify({
-		"fixture-two": { checkedAt: 1000, source: "web", plan: [{ used_percent: 5, limit_window_seconds: 18000 }], app: [] },
+		"fixture-one": { checkedAt: 1000, source: "web", plan: [{ used_percent: 5, limit_window_seconds: 18000 }], app: [] },
 	}));
 	mock.method(globalThis, "fetch", async () => assert.fail("Account commands must not query legacy quota servers"));
 	try {
@@ -47,9 +47,9 @@ test("/model preserves the official account and commands explicitly switch it", 
 			sessionManager: SessionManager.inMemory(home), noTools: "all",
 		});
 		try {
-			await session.setModel(runtime.getModel("openai-account-2", "gpt-6.1-sol")!);
+			assert.equal(runtime.getProvider("openai-account-2"), undefined);
 			await session.setModel(runtime.getModel("openai", "gpt-6-astra")!);
-			assert.equal(session.model?.provider, "openai-account-2");
+			assert.equal(session.model?.provider, "openai");
 			assert.equal(session.model?.id, "gpt-6-astra");
 			await session.setModel({ ...runtime.getModel("openai", "gpt-6-astra")!,
 				provider: "commandcode", id: "deepseek/deepseek-v4.1-flash" });
@@ -77,11 +77,8 @@ test("/model preserves the official account and commands explicitly switch it", 
 					},
 				};
 			};
-			await command.handler("", context(1) as any);
-			assert.equal(session.model?.provider, "openai-account-2");
-			assert.equal(session.model?.id, "gpt-6.1-sol");
-			assert.ok(notices.at(-1)?.includes("모델: gpt-6.1-sol"));
 			await command.handler("", context(0) as any);
+			assert.ok(notices.at(-1)?.includes("모델: gpt-6.1-sol"));
 			assert.equal(session.model?.provider, "openai");
 			assert.equal(session.model?.id, "gpt-6.1-sol");
 			assert.ok(widgets[0].some((line) => line.includes("현재 한도 갱신 중")));
@@ -123,19 +120,19 @@ test("/model preserves the official account and commands explicitly switch it", 
 					setWidget(_id: string, lines?: string[]) {
 						if (!lines) return;
 						freshWidgets.push(lines);
-						if (lines.filter((line) => line.includes("(Codex 조회)")).length === 2) finished();
+						if (lines.filter((line) => line.includes("(Codex 조회)")).length === 1) finished();
 					},
 					select: async (_title: string, choices: string[]) => { await lookedUp; return choices.at(-1); },
 					notify: (message: string) => notices.push(message),
 				},
 			} as any);
-			assert.equal(calls, 4);
+			assert.equal(calls, 3, "two Codex identities checked for binding, only remaining account quota queried");
 			assert.ok(freshWidgets[0].some((line) => line.includes("현재 한도 갱신 중")));
-			assert.equal(freshWidgets.at(-1)!.filter((line) => line.includes("80% 남음")).length, 2);
+			assert.equal(freshWidgets.at(-1)!.filter((line) => line.includes("80% 남음")).length, 1);
 			assert.ok(freshWidgets.at(-1)!.every((line) => !line.includes("이전 조회 플랜") && !line.includes("확인 불가")));
 			const cache = JSON.parse(await fs.readFile(path.join(agentDir, "openai-account-quota.json"), "utf8"));
 			assert.equal(cache.oaiapp_one.accountId, "one");
-			assert.equal(cache.oaiapp_two.accountId, "two");
+			assert.equal(cache.oaiapp_two, undefined, "removed account must not be queried or cached");
 			assert.equal(await fs.access(browserMarker).then(() => true, () => false), false);
 		} finally { session.dispose(); }
 	} finally {

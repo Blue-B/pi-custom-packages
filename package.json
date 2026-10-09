@@ -1,7 +1,7 @@
 {
   "name": "pi-custom-packages",
   "version": "0.1.0",
-  "description": "Packages for the pi coding agent: elapsed-time status, session guards, Herdr integration, Windows/WSL tools, and ChatGPT subscription account switching.",
+  "description": "Packages for the pi coding agent: elapsed-time status, session guards, Herdr integration, Windows/WSL tools, a low-glare light terminal, and ChatGPT subscription account switching.",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -32,7 +32,11 @@
       "./packages/pi-winshot/extensions/winshot/index.ts"
     ],
     "skills": [
-      "./packages/pi-winshot/skills/winshot"
+      "./packages/pi-winshot/skills/winshot",
+      "./packages/pi-light-eyes/skills/light-eyes"
+    ],
+    "themes": [
+      "./packages/pi-light-eyes/themes/chatgpt-light.json"
     ]
   }
 }
