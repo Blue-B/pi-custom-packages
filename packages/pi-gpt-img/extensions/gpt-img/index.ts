@@ -26,7 +26,7 @@ import * as https from "node:https";
 const FORMATS = ["png", "jpeg", "webp"];
 const BACKGROUNDS = ["auto", "opaque", "transparent"];
 const TIMEOUT_MS = 600_000;
-// Highest-quality GPT Image model. The ChatGPT-plan backend accepts it but may still override model/quality.
+// Quality/size are chosen server-side from the prompt on ChatGPT plans (tested: request values ignored).
 const IMAGE_MODEL = "gpt-image-2.5-sunburst";
 
 // Embed downscale — same philosophy as winshot: keep the full-res file on disk,
@@ -175,7 +175,7 @@ async function callCodexImagesEndpoint(
 	const images = [];
 	for (const p of imagePaths) images.push({ image_url: await imageToDataUri(p) });
 	const kind = images.length ? "edits" : "generations";
-	const body: any = { prompt, background, model: IMAGE_MODEL, quality: "high", size: "auto" };
+	const body: any = { prompt, background, model: IMAGE_MODEL, quality: "auto", size: "auto" };
 	if (images.length) body.images = images.slice(0, 5);
 	const postData = JSON.stringify(body);
 	return new Promise((resolve, reject) => {
@@ -253,7 +253,7 @@ async function callCodexImage(
 		instructions:
 			"Generate image assets. When reference images are attached, keep the subject identical unless the prompt specifies otherwise.",
 		input: [{ role: "user", content }],
-		tools: [{ type: "image_generation", model: IMAGE_MODEL, quality: "high", output_format: format }],
+		tools: [{ type: "image_generation", model: IMAGE_MODEL, output_format: format }],
 		tool_choice: { type: "image_generation" },
 		parallel_tool_calls: false,
 		text: { verbosity: "low" },
