@@ -1,5 +1,10 @@
 /**
- * gpt_img — txt2img + img2img via ChatGPT/Codex OAuth backend (gpt-image-2).
+ * gpt_img — txt2img + img2img via ChatGPT/Codex OAuth backend (requests gpt-image-2.5-sunburst).
+ *
+ * Primary path: the Codex app's native image endpoints (/backend-api/codex/images/{generations,edits}),
+ * which honour `background: "transparent"` (real RGBA cut-outs). The server picks the image model for a
+ * ChatGPT plan (reported as gpt-image-2-codex; model/size/quality fields are ignored), so the newest
+ * ChatGPT Images model is whatever OpenAI serves there. Fallback: Responses API image_generation tool.
  *
  * Self-contained: no external custom package dependency.
  * Replicates the logic from the user's custom gptimage_oauth (for img2img support via input_image).
@@ -19,7 +24,10 @@ import { type Static, Type } from "typebox";
 import * as https from "node:https";
 
 const FORMATS = ["png", "jpeg", "webp"];
+const BACKGROUNDS = ["auto", "opaque", "transparent"];
 const TIMEOUT_MS = 600_000;
+// Highest-quality GPT Image model. The ChatGPT-plan backend accepts it but may still override model/quality.
+const IMAGE_MODEL = "gpt-image-2.5-sunburst";
 
 // Embed downscale — same philosophy as winshot: keep the full-res file on disk,
 // shrink the base64 block that enters the session/provider payload (a full-res
@@ -103,6 +111,12 @@ const TOOL_PARAMS = Type.Object({
 		}),
 	),
 	format: Type.Optional(StringEnum(FORMATS)),
+	background: Type.Optional(
+		StringEnum(BACKGROUNDS, {
+			description:
+				"transparent = RGBA PNG cut-out (e.g. a character part with no background); default auto.",
+		}),
+	),
 	dryRun: Type.Optional(
 		Type.Boolean({
 			description:
@@ -149,6 +163,75 @@ async function imageToDataUri(path: string): Promise<string> {
 	return `data:${mime};base64,${buf.toString("base64")}`;
 }
 
+type ImageMeta = { endpoint: string; quality?: string; size?: string; background?: string; limit?: string };
+
+// Codex app's own image endpoints (same OAuth). Throws with status on HTTP errors so the caller can fall back.
+async function callCodexImagesEndpoint(
+	prompt: string,
+	imagePaths: string[],
+	background: string,
+): Promise<{ bytes: Buffer; meta: ImageMeta }> {
+	const { token, accountId } = await loadCodexAuth();
+	const images = [];
+	for (const p of imagePaths) images.push({ image_url: await imageToDataUri(p) });
+	const kind = images.length ? "edits" : "generations";
+	const body: any = { prompt, background, model: IMAGE_MODEL, quality: "high", size: "auto" };
+	if (images.length) body.images = images.slice(0, 5);
+	const postData = JSON.stringify(body);
+	return new Promise((resolve, reject) => {
+		const req = https.request(
+			{
+				hostname: "chatgpt.com",
+				path: `/backend-api/codex/images/${kind}`,
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${token}`,
+					"ChatGPT-Account-ID": accountId,
+					originator: "codex_cli_rs",
+					"User-Agent": `codex_cli_rs/0.161.0 (${process.platform}; ${process.arch}) pi`,
+					"Content-Type": "application/json",
+				},
+				timeout: TIMEOUT_MS,
+			},
+			(res) => {
+				const chunks: Buffer[] = [];
+				res.on("data", (c: Buffer) => chunks.push(c));
+				res.on("end", () => {
+					const text = Buffer.concat(chunks).toString("utf8");
+					if ((res.statusCode || 0) >= 400) {
+						const e: any = new Error(`images/${kind} HTTP ${res.statusCode}: ${text.slice(0, 300)}`);
+						e.status = res.statusCode;
+						return reject(e);
+					}
+					try {
+						const d = JSON.parse(text);
+						const b64 = d?.data?.[0]?.b64_json;
+						if (!b64) return reject(new Error(`images/${kind}: no image in response`));
+						resolve({
+							bytes: Buffer.from(b64, "base64"),
+							meta: {
+								endpoint: `images/${kind}`,
+								quality: d.quality,
+								size: d.size,
+								background: d.background,
+								limit: [res.headers["x-codex-active-limit"], res.headers["x-codex-primary-used-percent"]]
+									.filter(Boolean)
+									.join(" used%="),
+							},
+						});
+					} catch (err) {
+						reject(err);
+					}
+				});
+			},
+		);
+		req.on("timeout", () => req.destroy(new Error("images endpoint timeout")));
+		req.on("error", reject);
+		req.write(postData);
+		req.end();
+	});
+}
+
 async function callCodexImage(
 	prompt: string,
 	imagePaths: string[],
@@ -164,13 +247,13 @@ async function callCodexImage(
 	}
 
 	const body = {
-		model: "gpt-5.5",
+		model: "gpt-6-sol",
 		store: false,
 		stream: true,
 		instructions:
 			"Generate image assets. When reference images are attached, keep the subject identical unless the prompt specifies otherwise.",
 		input: [{ role: "user", content }],
-		tools: [{ type: "image_generation", output_format: format }],
+		tools: [{ type: "image_generation", model: IMAGE_MODEL, quality: "high", output_format: format }],
 		tool_choice: { type: "image_generation" },
 		parallel_tool_calls: false,
 		text: { verbosity: "low" },
@@ -285,9 +368,9 @@ export default function gptImg(pi: ExtensionAPI) {
 		name: "gpt_img",
 		label: "GPT Image",
 		description:
-			"Generate or edit images with gpt-image-2 via ChatGPT/Codex OAuth (no API key). Supports txt2img and img2img via reference images.",
+			"Generate or edit images with gpt-image-2.5-sunburst via ChatGPT/Codex OAuth (no API key). Supports txt2img and img2img via reference images.",
 		promptSnippet:
-			"Generate or edit images with gpt-image-2 (txt2img + img2img).",
+			"Generate or edit images with gpt-image-2.5-sunburst (txt2img + img2img).",
 		promptGuidelines: [
 			"Use for raster image generation or img2img edits with reference images.",
 			"Pass `images` array for img2img; omit for txt2img.",
@@ -305,7 +388,7 @@ export default function gptImg(pi: ExtensionAPI) {
 			await mkdir(join(outPath, ".."), { recursive: true });
 
 			onUpdate?.({
-				content: [{ type: "text", text: `Running gpt-image-2 ${mode}...` }],
+				content: [{ type: "text", text: `Running ${IMAGE_MODEL} ${mode}...` }],
 				details: { mode, format, refs: refs.length, outPath },
 			});
 
@@ -317,7 +400,15 @@ export default function gptImg(pi: ExtensionAPI) {
 			}
 
 			try {
-				const result = await callCodexImage(params.prompt, refs, format, false);
+				const background = params.background || "auto";
+				let result: { bytes?: Buffer; meta?: ImageMeta };
+				try {
+					result = await callCodexImagesEndpoint(params.prompt, refs, background);
+				} catch (e: any) {
+					// Older accounts/clients without the images endpoint: Responses API tool (no transparency).
+					if (e?.status && e.status !== 404 && e.status !== 405) throw e;
+					result = { ...(await callCodexImage(params.prompt, refs, format, false)), meta: { endpoint: "responses" } };
+				}
 				if (!result.bytes) throw new Error("No image bytes");
 				await writeFile(outPath, result.bytes);
 				// Full-res stays on disk; embed the downscaled version to keep the session lean.
@@ -326,13 +417,14 @@ export default function gptImg(pi: ExtensionAPI) {
 					mimeType: mimeForFormat(format),
 				};
 				const data = embed.bytes.toString("base64");
-				const summary = `Generated via gpt-image-2 (${mode}). Saved to ${outPath}.`;
+				const m = result.meta || { endpoint: "?" };
+				const summary = `Generated via ChatGPT Images (${mode}, ${m.endpoint}${m.size ? `, ${m.size}` : ""}${m.quality ? `, quality ${m.quality}` : ""}${m.background ? `, background ${m.background}` : ""}${m.limit ? `, ${m.limit}` : ""}). Saved to ${outPath}.`;
 				return {
 					content: [
 						{ type: "text", text: summary },
 						{ type: "image", data, mimeType: embed.mimeType },
 					],
-					details: { mode, outPath },
+					details: { mode, outPath, ...result.meta },
 				};
 			} catch (err: any) {
 				throw new Error(`gpt_img failed: ${err?.message || err}`);

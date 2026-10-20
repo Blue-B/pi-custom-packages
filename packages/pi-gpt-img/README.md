@@ -1,10 +1,10 @@
 # pi-gpt-img
 
-> `gpt_img` tool: text-to-image and image-to-image generation via the ChatGPT Codex OAuth backend (gpt-image-2), reusing the OAuth token pi already stores for the `openai-codex` provider.
+> `gpt_img` tool: text-to-image and image-to-image generation via the ChatGPT Codex OAuth backend (gpt-image-2.5-sunburst), reusing the OAuth token pi already stores for the `openai-codex` provider.
 
 ## Why
 
-Image generation in AI agents usually requires a separate API key for OpenAI, a paid subscription, or a local model setup. If you already have a ChatGPT/Codex OAuth login configured in pi (the same one powering codex-based tools), you can generate images with the `gpt-image-2` model at no extra cost.
+Image generation in AI agents usually requires a separate API key for OpenAI, a paid subscription, or a local model setup. If you already have a ChatGPT/Codex OAuth login configured in pi (the same one powering codex-based tools), you can generate images with the `gpt-image-2.5-sunburst` model at no extra cost.
 
 `pi-gpt-img` registers a single `gpt_img` tool that:
 
