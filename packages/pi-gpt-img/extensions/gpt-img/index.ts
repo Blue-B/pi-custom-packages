@@ -1,5 +1,5 @@
 /**
- * gpt_img — txt2img + img2img via ChatGPT/Codex OAuth backend (requests gpt-image-2.5-sunburst).
+ * gpt_img — txt2img + img2img via ChatGPT/Codex OAuth backend (ChatGPT Images; server picks the model).
  *
  * Primary path: the Codex app's native image endpoints (/backend-api/codex/images/{generations,edits}),
  * which honour `background: "transparent"` (real RGBA cut-outs). The server picks the image model for a
@@ -26,8 +26,9 @@ import * as https from "node:https";
 const FORMATS = ["png", "jpeg", "webp"];
 const BACKGROUNDS = ["auto", "opaque", "transparent"];
 const TIMEOUT_MS = 600_000;
-// Quality/size are chosen server-side from the prompt on ChatGPT plans (tested: request values ignored).
-const IMAGE_MODEL = "gpt-image-2.5-sunburst";
+// Same request as the official Codex client. On ChatGPT plans the server rewrites model/quality/size
+// (responses echo model "gpt-image-2-codex" even for other names), so only prompt/background/images matter.
+const IMAGE_MODEL = "gpt-image-2";
 
 // Embed downscale — same philosophy as winshot: keep the full-res file on disk,
 // shrink the base64 block that enters the session/provider payload (a full-res
@@ -368,9 +369,9 @@ export default function gptImg(pi: ExtensionAPI) {
 		name: "gpt_img",
 		label: "GPT Image",
 		description:
-			"Generate or edit images with gpt-image-2.5-sunburst via ChatGPT/Codex OAuth (no API key). Supports txt2img and img2img via reference images.",
+			"Generate or edit images with ChatGPT Images via ChatGPT/Codex OAuth (no API key; OpenAI picks the model, quality and size from the prompt). Supports txt2img and img2img via reference images.",
 		promptSnippet:
-			"Generate or edit images with gpt-image-2.5-sunburst (txt2img + img2img).",
+			"Generate or edit images with ChatGPT Images (txt2img + img2img).",
 		promptGuidelines: [
 			"Use for raster image generation or img2img edits with reference images.",
 			"Pass `images` array for img2img; omit for txt2img.",

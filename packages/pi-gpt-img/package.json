@@ -1,7 +1,7 @@
 {
   "name": "pi-gpt-img",
   "version": "0.2.0",
-  "description": "gpt_img tool: text-to-image and image-to-image generation via the ChatGPT Codex OAuth backend (gpt-image-2.5-sunburst), reusing the OAuth token pi already stores for the openai-codex provider.",
+  "description": "gpt_img tool: text-to-image and image-to-image generation via the ChatGPT Codex OAuth backend (ChatGPT Images), reusing the OAuth token pi already stores for the openai-codex provider.",
   "keywords": [
     "pi-package",
     "pi",
