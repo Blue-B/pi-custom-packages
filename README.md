@@ -76,6 +76,7 @@ it through `powershell.exe` over WSL interop, with no Linux-side installation.
 | [pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked) | [herdr](https://herdr.dev)'s sidebar shows a pane as working the entire time pi is actually waiting on an `ask_user_question` answer. This emits the blocked event herdr's own integration already listens for. |
 | [pi-herdr-subagent-working](./packages/pi-herdr-subagent-working) | Keeps a herdr pane working while async `pi-subagents` children are still running. Replaces herdr's managed Pi reporter, so it is installed separately rather than through the root bundle. |
 | [pi-openai-accounts](./packages/pi-openai-accounts) | Switches between two ChatGPT subscription OAuth accounts (`openai`, `openai-account-2`). Preserves the account when changing models and rotates on quota errors without duplicate retries. `/openai-accounts` shows plan quotas through separate Codex credentials, with automatic account binding and no browser during refresh. Local token totals are shown separately. Requires Pi 0.99.2+; see the package README for first-time quota setup. |
+| [pi-webgpt-image](./packages/pi-webgpt-image) | `webgpt-image` skill: generates images by driving a logged-in ChatGPT web chat in the browser instead of the Codex image endpoint. `batch.sh` runs several chats at once for variations, and edits can stay inside one thread. Same backend and quality as `gpt_img`; the reason to use it is having only a web login, or wanting parallel chats. |
 
 ## Platform support
 
@@ -89,6 +90,7 @@ The other packages each want something specific.
 | [herdr](https://herdr.dev) with `herdr integration install pi` | herdr-ask-blocked |
 | [herdr](https://herdr.dev) and [pi-subagents](https://www.npmjs.com/package/pi-subagents); replaces the managed Pi reporter | herdr-subagent-working |
 | A ChatGPT or Codex OAuth login | gpt-img |
+| A ChatGPT web login plus a browser CLI (`ab`, or `agent-browser` via `WG_BROWSER`) | webgpt-image |
 | Pi 0.99.2+ and ChatGPT OAuth; Codex CLI file credentials for quota lookup | openai-accounts |
 
 Windows screen capture requires WSL interop; native Linux has no Windows desktop

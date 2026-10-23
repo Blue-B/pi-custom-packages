@@ -1,0 +1,40 @@
+{
+  "name": "pi-webgpt-image",
+  "version": "0.1.0",
+  "description": "webgpt-image skill: generate images through a logged-in ChatGPT web chat in the agent browser, with parallel chats for variations. Same image backend as the gpt_img tool, driven through the web UI instead of the Codex image endpoint.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-skill",
+    "skill",
+    "image-generation",
+    "chatgpt",
+    "browser-automation",
+    "agent-browser",
+    "wsl"
+  ],
+  "license": "MIT",
+  "author": "Blue-B",
+  "type": "module",
+  "files": [
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-webgpt-image"
+  },
+  "homepage": "https://github.com/Blue-B/pi-custom-packages#readme",
+  "bugs": {
+    "url": "https://github.com/Blue-B/pi-custom-packages/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.70.0"
+  }
+}

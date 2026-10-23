@@ -33,7 +33,8 @@
     ],
     "skills": [
       "./packages/pi-winshot/skills/winshot",
-      "./packages/pi-light-eyes/skills/light-eyes"
+      "./packages/pi-light-eyes/skills/light-eyes",
+      "./packages/pi-webgpt-image/skills/webgpt-image"
     ],
     "themes": [
       "./packages/pi-light-eyes/themes/chatgpt-light.json"
