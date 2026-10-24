@@ -24,6 +24,7 @@ pi install git:github.com/Blue-B/pi-custom-packages
 `pi-herdr-subagent-working` is intentionally excluded from that bundle. It
 replaces herdr's managed Pi reporter and must be installed separately after the
 reporter is disabled, as described in [its README](./packages/pi-herdr-subagent-working).
+`pi-prune-old-images` is left out too, because it rewrites session files.
 
 Or install packages one at a time. Nothing here is on npm, and `pi install` will
 not take a subdirectory of a repository, so clone first and install from disk:
@@ -74,6 +75,7 @@ it through `powershell.exe` over WSL interop, with no Linux-side installation.
 | --- | --- |
 | [pi-gpt-img](./packages/pi-gpt-img) | A `gpt_img` tool for text-to-image and image-to-image on ChatGPT Images (gpt-image-2-codex), reusing the ChatGPT/Codex OAuth token pi already holds. |
 | [pi-herdr-ask-blocked](./packages/pi-herdr-ask-blocked) | [herdr](https://herdr.dev)'s sidebar shows a pane as working the entire time pi is actually waiting on an `ask_user_question` answer. This emits the blocked event herdr's own integration already listens for. |
+| [pi-prune-old-images](./packages/pi-prune-old-images) | Long screenshot-heavy sessions keep every image as base64 in memory and in the session file, even after compaction stops sending them. This drops images that compaction already passed, so a 603 MB session went to 163 MB and its pi process from 2.2 GB to 0.5 GB. Rewrites session files, so it is installed separately rather than through the root bundle. |
 | [pi-herdr-subagent-working](./packages/pi-herdr-subagent-working) | Keeps a herdr pane working while async `pi-subagents` children are still running. Replaces herdr's managed Pi reporter, so it is installed separately rather than through the root bundle. |
 | [pi-openai-accounts](./packages/pi-openai-accounts) | Switches between two ChatGPT subscription OAuth accounts (`openai`, `openai-account-2`). Preserves the account when changing models and rotates on quota errors without duplicate retries. `/openai-accounts` shows plan quotas through separate Codex credentials, with automatic account binding and no browser during refresh. Local token totals are shown separately. Requires Pi 0.99.2+; see the package README for first-time quota setup. |
 | [pi-webgpt-image](./packages/pi-webgpt-image) | `webgpt-image` skill: generates images by driving a logged-in ChatGPT web chat in the browser instead of the Codex image endpoint. `batch.sh` runs several chats at once for variations, and edits can stay inside one thread. Same backend and quality as `gpt_img`; the reason to use it is having only a web login, or wanting parallel chats. |

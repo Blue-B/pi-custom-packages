@@ -1,0 +1,40 @@
+{
+  "name": "pi-prune-old-images",
+  "version": "0.1.0",
+  "description": "Drops image data that compaction already took out of the model context, from memory and from the session file, so long image-heavy sessions stay small.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Blue-B",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "compaction",
+    "images",
+    "session"
+  ],
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Blue-B/pi-custom-packages.git",
+    "directory": "packages/pi-prune-old-images"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/prune-old-images/index.ts"
+    ]
+  }
+}
