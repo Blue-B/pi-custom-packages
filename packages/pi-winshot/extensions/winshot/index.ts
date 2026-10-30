@@ -11,6 +11,8 @@
  *   - winshot_mask                mask one or more regions (black / blur / pixelate)
  *   - winshot_resize              resize keeping aspect ratio
  *   - winshot_info                report PNG dimensions
+ *   - winshot_ui_tree             UI Automation text tree of a window, with refs
+ *   - winshot_ui_act              click / type / focus an element by ref
  *
  * Commands:
  *   /winshot full          capture full screen and attach
@@ -261,6 +263,90 @@ export default function winshot(pi: ExtensionAPI): void {
 	const capturePs = findScript("capture.ps1");
 	const editPs = findScript("edit.ps1");
 	const listPs = findScript("list.ps1");
+	const uiaPs = findScript("uia.ps1");
+
+	// PowerShell throws dump a multi-line "위치 ..." trace; the first line is the message.
+	const firstLine = (r: PSResult) =>
+		(r.stderr || r.stdout).trim().split(/\r?\n/)[0];
+
+	// ----- ui_tree / ui_act ----------------------------------------------------
+
+	pi.registerTool({
+		name: "winshot_ui_tree",
+		label: "Read window UI tree",
+		description:
+			"Read a Windows window as text via UI Automation: buttons, links, inputs (with current value), checkboxes, " +
+			"each with a ref (e1, e2, ...). Far cheaper and more exact than a screenshot; try this first " +
+			"for native apps (Explorer, Settings, Control Panel, Office, WinForms/WPF). Then act with winshot_ui_act. " +
+			"Custom-drawn apps (games, KakaoTalk, Steam) expose almost nothing: fall back to winshot_capture. " +
+			"For web pages use the browser tool (ab), not this.",
+		parameters: Type.Object({
+			title: Type.String({
+				description: "case-insensitive substring of the window title",
+			}),
+			max_nodes: Type.Optional(
+				Type.Integer({ minimum: 1, description: "walk limit, default 300" }),
+			),
+			rects: Type.Optional(
+				Type.Boolean({
+					description:
+						"append screen rect @x,y wxh to each element (for winshot_capture region / mask)",
+				}),
+			),
+		}),
+		executionMode: "sequential",
+		execute: async (_id, params, signal) => {
+			const args = ["-Op", "tree", "-Title", shellQuote(params.title)];
+			if (params.max_nodes != null)
+				args.push("-MaxNodes", String(params.max_nodes));
+			if (params.rects) args.push("-Rects");
+			const r = await runPS(wslToWin(uiaPs), args, signal);
+			if (r.code !== 0) throw new Error(`ui tree failed: ${firstLine(r)}`);
+			return {
+				content: [{ type: "text", text: r.stdout.trim() }],
+				details: {},
+			};
+		},
+	});
+
+	pi.registerTool({
+		name: "winshot_ui_act",
+		label: "Act on UI element",
+		description:
+			"Act on an element by ref from the latest winshot_ui_tree, without moving the mouse or needing the window in front. " +
+			"click: invoke/toggle/select/expand. type: replace the input's value. focus: give keyboard focus. " +
+			"Refs expire when winshot_ui_tree runs again; re-read the tree after actions that change the screen.",
+		parameters: Type.Object({
+			ref: Type.String({ description: "e.g. e12" }),
+			action: Type.Union([
+				Type.Literal("click"),
+				Type.Literal("type"),
+				Type.Literal("focus"),
+			]),
+			value: Type.Optional(
+				Type.String({ description: "text for action=type" }),
+			),
+		}),
+		executionMode: "sequential",
+		execute: async (_id, params, signal) => {
+			const args = [
+				"-Op",
+				"act",
+				"-Ref",
+				shellQuote(params.ref),
+				"-Action",
+				params.action,
+				"-Value",
+				shellQuote(params.value ?? ""),
+			];
+			const r = await runPS(wslToWin(uiaPs), args, signal);
+			if (r.code !== 0) throw new Error(`ui act failed: ${firstLine(r)}`);
+			return {
+				content: [{ type: "text", text: r.stdout.trim() }],
+				details: {},
+			};
+		},
+	});
 
 	// ----- list_windows --------------------------------------------------------
 
@@ -333,6 +419,7 @@ export default function winshot(pi: ExtensionAPI): void {
 		label: "Capture Windows screen",
 		description:
 			"Capture the Windows host screen and return the PNG to the model. " +
+			"To read or operate a native app window, try winshot_ui_tree first (text, far fewer tokens). " +
 			"Modes:\n" +
 			" - full     : whole virtual desktop across all monitors\n" +
 			" - region   : screen-coordinate rectangle (-x -y -w -h required)\n" +

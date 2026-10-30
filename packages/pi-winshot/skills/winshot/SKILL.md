@@ -16,8 +16,12 @@ Capture and edit screenshots of the **Windows host** from inside a WSL pi sessio
 - `winshot_mask` — black-out / pixelate / blur one or more rectangles to hide sensitive info.
 - `winshot_resize` — scale a PNG (use before sending huge captures to the model).
 - `winshot_info` — width × height of a PNG.
+- `winshot_ui_tree` — read a window as **text** (UI Automation): buttons, links, inputs with values, checkboxes, each with a ref (`e12`); `rects=true` adds screen rects for region capture/mask. ~1s, a few hundred tokens instead of an image.
+- `winshot_ui_act` — `click` / `type` / `focus` an element by ref. No mouse movement, window need not be in front.
 
 ## Decision flow
+
+0. **Need to read or operate a native app?** Start with `winshot_ui_tree`, act with `winshot_ui_act`, re-read the tree after anything that changes the screen. Use a screenshot only when the tree is nearly empty (custom-drawn apps: games, KakaoTalk, Steam) or you need to see the visual layout. For web pages use the browser tool (`ab`); Chrome does not expose page content here.
 
 1. **What does the user want?**
    - A specific app/window → `winshot_list_windows` to find the title → `winshot_capture` with `mode=window`.
